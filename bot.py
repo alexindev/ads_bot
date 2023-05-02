@@ -10,8 +10,3 @@ dp = Dispatcher(bot)
 async def start_command_handler(message: types.Message):
     await message.answer('Привет! Я твой телеграм-бот!')
 
-
-@dp.message_handler()
-async def echo_message_handler(message: types.Message):
-    await message.answer(message.text)
-

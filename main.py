@@ -1,13 +1,10 @@
-from aiogram import Dispatcher, Bot, types
+from aiogram import Bot, types
 from config import TOKEN, SERVER_URL
 from aiohttp import web
 from bot import bot, dp
 
 
-# bot = Bot(TOKEN)
 Bot.set_current(bot)
-
-# dp = Dispatcher(bot)
 app = web.Application()
 
 webhook_path = f'/{TOKEN}'
