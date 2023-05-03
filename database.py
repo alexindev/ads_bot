@@ -19,7 +19,8 @@ class Database:
             cur.execute(
                 f'''CREATE TABLE IF NOT EXISTS "{city}" (
                     id SERIAL,
-                    task BYTEA,
+                    address VARCHAR(100),
+                    text VARCHAR(50),
                     status INTEGER)
                 '''
             )

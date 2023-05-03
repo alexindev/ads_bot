@@ -3,7 +3,9 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from database import Database
 from config import TOKEN, ADMINS
+from states import *
 from kb import *
+
 
 bot = Bot(TOKEN)
 storage = MemoryStorage()
@@ -90,6 +92,7 @@ async def config(message: types.Message):
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
 async def city_callback(callback: types.CallbackQuery, state: FSMContext):
     """Работа с отдельным городом"""
+    await callback.answer()
     city_name = callback.data.replace('city_', '')
 
     if callback.from_user.id in ADMINS:
@@ -119,3 +122,30 @@ async def delete_city(callback: types.CallbackQuery, state: FSMContext):
                                     message_id=callback.message.message_id,
                                     text=f'Ошибка удаления города: {current_city}',
                                     reply_markup=back)
+
+@dp.callback_query_handler(lambda c: c.data == 'new_job')
+async def new_job(callback: types.CallbackQuery, state: FSMContext):
+    """Добавление новых заданий"""
+    await bot.send_message(callback.from_user.id,
+                           text='Отправьте картинку:',
+                           reply_markup=back)
+    await state.set_state(Job.image)
+
+@dp.message_handler(content_types=types.ContentType.PHOTO, state=Job.image)
+async def process_image(message: types.Message, state: FSMContext):
+    """Получение картинки"""
+    async with state.proxy() as data:
+        data['image'] = message.photo[0].file_id
+    await message.reply('Введите идентификатор задания:')
+    await state.set_state(Job.text)
+
+@dp.message_handler(state=Job.text)
+async def save_job(message: types.Message, state: FSMContext):
+    """Идентификатор для задания и сохранение в базу данных"""
+    async with state.proxy() as data:
+        data['text'] = message.text
+
+    await state.finish()
+    await bot.send_message(message.from_user.id, 'Сохранили')
+
+
