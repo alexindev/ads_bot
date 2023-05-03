@@ -17,8 +17,9 @@ async def set_webhook():
 
 async def setup_bot_commands():
     bot_commands = [
-        types.BotCommand(command="/start", description="Старт"),
-        types.BotCommand(command="/config", description="Настройки"),
+        types.BotCommand("start", "Старт"),
+        types.BotCommand("help", "Подсказки"),
+        types.BotCommand("config", "Настройки"),
     ]
     await bot.set_my_commands(bot_commands)
 

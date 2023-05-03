@@ -19,16 +19,6 @@ async def start_command_handler(message: types.Message):
                            reply_markup=start)
 
 
-@dp.callback_query_handler(lambda c: c == 'back')
-async def cancel(callback: types.CallbackQuery):
-    """Возврат на главное меню"""
-    await callback.answer()
-    await bot.edit_message_text(chat_id=callback.from_user.id,
-                                message_id=callback.message.message_id,
-                                text='Привет! Это бот. Тут приветственное сообщение',
-                                reply_markup=start)
-
-
 @dp.callback_query_handler(lambda c: c.data == 'cities_list')
 async def choise_city(callback: types.CallbackQuery):
     """Вывести все города в инлайн кнопках"""
@@ -72,6 +62,7 @@ async def process_new_city(message: types.Message, state: FSMContext):
 @dp.callback_query_handler(lambda c: c.data == 'back', state='*')
 async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     """Выйти из FSM"""
+    await callback.answer()
     await state.finish()
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
@@ -86,6 +77,10 @@ async def config(message: types.Message):
         await bot.send_message(chat_id=message.from_user.id,
                                text='Меню настроек:',
                                reply_markup=config_kb)
+    else:
+        await bot.send_message(chat_id=message.from_user.id,
+                               text='🚫 Нет доступа 🚫',
+                               reply_markup=back)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
@@ -94,8 +89,10 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     city_name = callback.data.replace('city_', '')
 
+    async with state.proxy() as data:
+        data['current_city'] = city_name
+
     if callback.from_user.id in ADMINS:
-        await state.update_data(current_city=city_name)
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
                                     text=f'Выбран город: {city_name}',
@@ -104,7 +101,45 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
                                     text=f'Выбран город: {city_name}. Приступить к работе?',
-                                    reply_markup=job_start)
+                                    reply_markup=ready_to_work)
+
+
+@dp.callback_query_handler(lambda c: c.data == 'job_start', state='*')
+async def start_work(callback: types.CallbackQuery, state: FSMContext):
+    """Подготовка к работе"""
+    await callback.answer()
+    await bot.edit_message_text(chat_id=callback.from_user.id,
+                                message_id=callback.message.message_id,
+                                text='Перед началом работы необходимо отправить фотоотчет\n'
+                                     'Прикрепите фото к этому сообщению',
+                                reply_markup=back)
+    await state.set_state(User.first_report)
+
+
+@dp.message_handler(content_types=types.ContentType.PHOTO, state=User.first_report)
+async def first_report(message: types.Message, state: FSMContext):
+    """Получить фотоотчет о начале работы"""
+    async with state.proxy() as data:
+        data['first_report_image'] = message.photo[0].file_id
+
+    """Отправить фото в канал по отчетам"""
+
+    await bot.send_message(chat_id=message.from_user.id,
+                           text='Фото добавлено. Нажмите "Начать", чтобы приступить к работе',
+                           reply_markup=start_working
+                           )
+    await state.set_state(User.start_working)
+
+@dp.callback_query_handler(lambda c: c.data == 'start_work', state=User.start_working)
+async def started_work(callback: types.CallbackQuery, state: FSMContext):
+    """Ожидание получения финального отчета"""
+    await callback.answer()
+    await bot.edit_message_text(chat_id=callback.from_user.id,
+                                message_id=callback.message.message_id,
+                                text='После завершения работы необходимо написать отчет по шаблону из примера на фото\n',
+                                )
+    with open('images/template.jpg', 'rb') as photo:
+        await bot.send_photo(chat_id=callback.from_user.id, photo=types.InputFile(photo), reply_markup=back)
 
 
 @dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
