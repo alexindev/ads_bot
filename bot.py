@@ -2,7 +2,7 @@ from aiogram import types, Dispatcher, Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 from database import Database
-from config import TOKEN
+from config import TOKEN, ADMINS
 from kb import *
 
 bot = Bot(TOKEN)
@@ -28,7 +28,7 @@ async def cancel(callback: types.CallbackQuery):
                                 reply_markup=start)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'city')
+@dp.callback_query_handler(lambda c: c.data == 'cities_list')
 async def choise_city(callback: types.CallbackQuery):
     """Вывести все города в инлайн кнопках"""
     await callback.answer()
@@ -76,3 +76,29 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
                                 message_id=callback.message.message_id,
                                 text='Привет! Это бот. Тут приветственное сообщение',
                                 reply_markup=start)
+
+
+@dp.message_handler(commands=['config'])
+async def config(message: types.Message):
+    """Меню настроек"""
+    if message.from_user.id in ADMINS:
+        await bot.send_message(chat_id=message.from_user.id,
+                               text='Меню настроек:',
+                               reply_markup=config_kb)
+
+
+@dp.callback_query_handler(lambda c: c.data.startswith('city_'))
+async def city_callback(callback: types.CallbackQuery):
+    """Работа с отдельным городом"""
+    city_name = callback.data.replace('city_', '')
+
+    if callback.from_user.id in ADMINS:
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text=f'Выбран город: {city_name}',
+                                    reply_markup=admim_city_config)
+    else:
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text=f'Выбран город: {city_name}. Приступить к работе?',
+                                    reply_markup=job_start)
