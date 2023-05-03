@@ -59,7 +59,7 @@ async def process_new_city(message: types.Message, state: FSMContext):
         base.create_table(city)
         await bot.send_message(message.from_user.id,
                                text=f'Город {city} добавлен!',
-                               reply_markup=start)
+                               reply_markup=city_add)
         await state.finish()
     else:
         await bot.send_message(chat_id=message.from_user.id,
@@ -88,11 +88,12 @@ async def config(message: types.Message):
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
-async def city_callback(callback: types.CallbackQuery):
+async def city_callback(callback: types.CallbackQuery, state: FSMContext):
     """Работа с отдельным городом"""
     city_name = callback.data.replace('city_', '')
 
     if callback.from_user.id in ADMINS:
+        await state.update_data(current_city=city_name)
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
                                     text=f'Выбран город: {city_name}',
@@ -102,3 +103,19 @@ async def city_callback(callback: types.CallbackQuery):
                                     message_id=callback.message.message_id,
                                     text=f'Выбран город: {city_name}. Приступить к работе?',
                                     reply_markup=job_start)
+
+@dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
+async def delete_city(callback: types.CallbackQuery, state: FSMContext):
+    """Удаление города"""
+    data = await state.get_data()
+    current_city = data.get('current_city')
+    if base.delete_city(current_city):
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text=f'Город: {current_city} удален',
+                                    reply_markup=back)
+    else:
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text=f'Ошибка удаления города: {current_city}',
+                                    reply_markup=back)

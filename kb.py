@@ -20,6 +20,11 @@ job_start = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
+city_add = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardMarkup(text='Добавить новый город', callback_data='new_city'),
+    InlineKeyboardButton(text='Назад', callback_data='back')
+)
+
 admim_city_config = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить задания', callback_data='new_job'),
     InlineKeyboardButton(text='Удалить город', callback_data='delete_city'),

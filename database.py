@@ -1,4 +1,6 @@
 import psycopg2
+from loguru import logger
+
 from config import PG_BASE, PG_USER, PG_PASS
 
 
@@ -38,3 +40,13 @@ class Database:
                         (city,))
             return cur.fetchone()[0]
 
+    def delete_city(self, city: str) -> bool:
+        """Удалить город"""
+        with self._conn.cursor() as cur:
+            try:
+                cur.execute(f'DROP TABLE "{city}"')
+                self._conn.commit()
+                return True
+            except Exception as e:
+                logger.error(e)
+                return False
