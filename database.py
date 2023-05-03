@@ -11,16 +11,30 @@ class Database:
             password=PG_PASS
         )
 
-    def create_table(self, city):
+    def create_table(self, city: str) -> None:
+        """Создать новый город"""
         with self._conn.cursor() as cur:
             cur.execute(
-                '''CREATE TABLE IF NOT EXISTS {} (
+                f'''CREATE TABLE IF NOT EXISTS "{city}" (
                     id SERIAL,
                     task BYTEA,
                     status INTEGER)
-                '''.format(city)
+                '''
             )
         self._conn.commit()
 
+    def get_cities(self):
+        """Получить все города"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public';"
+            )
+            return cur.fetchall()
 
+    def get_city(self, city: str):
+        """Получить один город"""
+        with self._conn.cursor() as cur:
+            cur.execute('SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = %s)',
+                        (city,))
+            return cur.fetchone()[0]
 

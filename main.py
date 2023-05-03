@@ -1,4 +1,6 @@
 from aiogram import Bot, types
+from loguru import logger
+
 from config import TOKEN, SERVER_URL
 from aiohttp import web
 from bot import bot, dp
@@ -12,20 +14,21 @@ webhook_path = f'/{TOKEN}'
 async def set_webhook():
     webhook_uri = f'{SERVER_URL}{webhook_path}'
     await bot.set_webhook(webhook_uri)
+
 async def on_startup(_):
     await set_webhook()
 
 async def handle_webhook(request):
-    url = str(request.url)
-    index = url.rfind('/')
-    token = url[index+1:]
-    if token == TOKEN:
+    try:
         json_data = await request.json()
         update = types.Update(**json_data)
-
         await dp.process_update(update)
         return web.Response()
-    return web.Response(status=403)
+    except Exception as e:
+        logger.error(e)
+        print(await request.json())
+        return web.Response()
+
 
 app.router.add_post(f'/{TOKEN}', handle_webhook)
 
