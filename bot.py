@@ -6,7 +6,6 @@ from config import TOKEN, ADMINS
 from states import *
 from kb import *
 
-
 bot = Bot(TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -107,6 +106,7 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
                                     text=f'Выбран город: {city_name}. Приступить к работе?',
                                     reply_markup=job_start)
 
+
 @dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
 async def delete_city(callback: types.CallbackQuery, state: FSMContext):
     """Удаление города"""
@@ -123,13 +123,18 @@ async def delete_city(callback: types.CallbackQuery, state: FSMContext):
                                     text=f'Ошибка удаления города: {current_city}',
                                     reply_markup=back)
 
+
 @dp.callback_query_handler(lambda c: c.data == 'new_job')
 async def new_job(callback: types.CallbackQuery, state: FSMContext):
     """Добавление новых заданий"""
+    await callback.answer()
+    async with state.proxy() as data:
+        data['city'] = callback.message.text.split(' ')[-1]
     await bot.send_message(callback.from_user.id,
                            text='Отправьте картинку:',
                            reply_markup=back)
     await state.set_state(Job.image)
+
 
 @dp.message_handler(content_types=types.ContentType.PHOTO, state=Job.image)
 async def process_image(message: types.Message, state: FSMContext):
@@ -139,6 +144,7 @@ async def process_image(message: types.Message, state: FSMContext):
     await message.reply('Введите идентификатор задания:')
     await state.set_state(Job.text)
 
+
 @dp.message_handler(state=Job.text)
 async def save_job(message: types.Message, state: FSMContext):
     """Идентификатор для задания и сохранение в базу данных"""
@@ -146,6 +152,11 @@ async def save_job(message: types.Message, state: FSMContext):
         data['text'] = message.text
 
     await state.finish()
-    await bot.send_message(message.from_user.id, 'Сохранили')
-
-
+    if not base.get_job(data['city'], data['text']):
+        base.new_job(data['city'], data['image'], data['text'], status=1)
+        await bot.send_message(message.from_user.id, 'Скрин добавлен',
+                               reply_markup=back)
+    else:
+        await bot.send_message(message.from_user.id,
+                               f'Скрин с id: {data["text"]} уже добавлен',
+                               reply_markup=back)

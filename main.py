@@ -15,8 +15,16 @@ async def set_webhook():
     webhook_uri = f'{SERVER_URL}{webhook_path}'
     await bot.set_webhook(webhook_uri)
 
+async def setup_bot_commands():
+    bot_commands = [
+        types.BotCommand(command="/start", description="Старт"),
+        types.BotCommand(command="/config", description="Настройки"),
+    ]
+    await bot.set_my_commands(bot_commands)
+
 async def on_startup(_):
     await set_webhook()
+    await setup_bot_commands()
 
 async def handle_webhook(request):
     try:
@@ -26,7 +34,6 @@ async def handle_webhook(request):
         return web.Response()
     except Exception as e:
         logger.error(e)
-        print(await request.json())
         return web.Response()
 
 

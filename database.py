@@ -19,7 +19,7 @@ class Database:
             cur.execute(
                 f'''CREATE TABLE IF NOT EXISTS "{city}" (
                     id SERIAL,
-                    address VARCHAR(100),
+                    image VARCHAR(100),
                     text VARCHAR(50),
                     status INTEGER)
                 '''
@@ -51,3 +51,17 @@ class Database:
             except Exception as e:
                 logger.error(e)
                 return False
+
+    def new_job(self, city, image, text, status):
+        """Добавить новую работу"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                f'INSERT INTO "{city}" (image, text, status) VALUES (%s, %s, %s)',
+                (image, text, status,))
+            self._conn.commit()
+
+    def get_job(self, city, text):
+        """Получить запись c идентификатором"""
+        with self._conn.cursor() as cur:
+            cur.execute(f'SELECT * FROM "{city}" WHERE text=%s', (text,))
+            return cur.fetchone()
