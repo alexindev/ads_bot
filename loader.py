@@ -75,6 +75,7 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
                                text='Привет! Это бот. Тут приветственное сообщение',
                                reply_markup=start)
 
+
 @dp.message_handler(commands=['config'])
 async def config(message: types.Message):
     """Меню настроек"""
@@ -109,8 +110,8 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
                                     reply_markup=ready_to_work)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'jobs', state='*')
-async def jobs(callback: types.CallbackQuery, state: FSMContext):
+@dp.callback_query_handler(lambda c: c.data == 'jobs')
+async def jobs(callback: types.CallbackQuery):
     """Работа с заданиями"""
     await callback.answer()
     await bot.edit_message_text(chat_id=callback.from_user.id,
@@ -142,9 +143,6 @@ async def delete_city(callback: types.CallbackQuery, state: FSMContext):
 async def new_job(callback: types.CallbackQuery, state: FSMContext):
     """Добавление новых заданий"""
     await callback.answer()
-    async with state.proxy() as data:
-        current_city = data.get('current_city')
-
     await bot.send_message(callback.from_user.id,
                            text='Отправьте картинку:',
                            reply_markup=back)
@@ -196,10 +194,14 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
 async def jods_view(callback: types.CallbackQuery, state: FSMContext):
     """Работа с выбранным заданием"""
     await callback.answer()
+
     job_id = callback.data.replace('job_', '')
-    await state.set_state()
     state_data = await state.get_data()
     city = state_data.get('current_city')
+
+    async with state.proxy() as data:
+        data['job_id'] = job_id
+
     photo = base.get_photo(city, job_id)
 
     await bot.send_photo(chat_id=callback.from_user.id,
@@ -208,17 +210,21 @@ async def jods_view(callback: types.CallbackQuery, state: FSMContext):
                          reply_markup=kb_job_photo)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'correct_job')
-async def correct_job(callback: types.CallbackQuery):
-    """Редактирование заданий"""
+@dp.callback_query_handler(lambda c: c.data == 'delete_job_photo', state='*')
+async def delete_job_fucn(callback: types.CallbackQuery, state: FSMContext):
+    """Удалить задание"""
     await callback.answer()
-    await bot.edit_message_text(chat_id=callback.from_user.id,
-                                message_id=callback.message.message_id,
-                                text='Введите идентификатор задания:',
-                                reply_markup=back)
+    data = await state.get_data()
+    city = data.get('current_city')
+    job_id = data.get('job_id')
+    base.delete_job(city, job_id)
+
+    await bot.send_message(chat_id=callback.from_user.id,
+                           text=f'Задание с идентификатором "{job_id}" удалено',
+                           reply_markup=delete_job)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'job_start', state='*')
+@dp.callback_query_handler(lambda c: c.data == 'start_job', state='*')
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
     """Подготовка к работе пользователя"""
     await callback.answer()

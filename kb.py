@@ -16,7 +16,7 @@ config_kb = InlineKeyboardMarkup(row_width=1).add(
 )
 
 ready_to_work = InlineKeyboardMarkup(row_width=2).add(
-    InlineKeyboardButton(text="Да", callback_data='job_start'),
+    InlineKeyboardButton(text="Да", callback_data='start_job'),
     InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
@@ -52,10 +52,14 @@ job_add = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
-kb_job_photo = InlineKeyboardMarkup(row_width=2).add(
-    InlineKeyboardButton(text='Обновить', callback_data='update_job_photo'),
+kb_job_photo = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Удалить', callback_data='delete_job_photo'),
     InlineKeyboardButton(text='Назад', callback_data='back_new')
+)
+
+delete_job = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Назад', callback_data='get_job'),
+    InlineKeyboardButton(text='На главную', callback_data='back')
 )
 
 def get_cities_keyboard(db):
