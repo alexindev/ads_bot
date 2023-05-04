@@ -52,6 +52,12 @@ job_add = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
+kb_job_photo = InlineKeyboardMarkup(row_width=2).add(
+    InlineKeyboardButton(text='Обновить', callback_data='update_job_photo'),
+    InlineKeyboardButton(text='Удалить', callback_data='delete_job_photo'),
+    InlineKeyboardButton(text='Назад', callback_data='back_new')
+)
+
 def get_cities_keyboard(db):
     """Кнопки со всеми городами"""
     cities = db.get_cities()
@@ -64,8 +70,8 @@ def get_cities_keyboard(db):
 def get_jobs_kb(db, city):
     """Кнопки со всеми заданиями"""
     jobs = db.get_all_jobs(city)
-    kb = InlineKeyboardMarkup(row_width=1)
+    kb = InlineKeyboardMarkup(row_width=3)
     for job in jobs:
-        kb.add(InlineKeyboardButton(text=job[0], callback_data=f"{job[0]}"))
+        kb.insert(InlineKeyboardButton(text=job[0], callback_data=f"job_{job[0]}"))
     kb.add(InlineKeyboardButton(text='Назад', callback_data='back'))
     return kb

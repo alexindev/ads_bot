@@ -18,6 +18,7 @@ async def start_command_handler(message: types.Message):
                            text='Привет! Это бот. Тут приветственное сообщение',
                            reply_markup=start)
 
+
 @dp.callback_query_handler(lambda c: c.data == 'cities_list')
 async def choise_city(callback: types.CallbackQuery):
     """Вывести все города в инлайн кнопках"""
@@ -28,17 +29,20 @@ async def choise_city(callback: types.CallbackQuery):
                                 text='Выберите город:',
                                 reply_markup=cities)
 
+
 @dp.callback_query_handler(lambda c: c.data == 'new_city')
 async def new_city(callback: types.CallbackQuery, state: FSMContext):
     """Добавить новый город"""
     await callback.answer()
-    await state.set_state('new_city')
+    await state.set_state(City.city)
+
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
                                 text='Название нового города:',
                                 reply_markup=back)
 
-@dp.message_handler(state='new_city')
+
+@dp.message_handler(state=City.city)
 async def process_new_city(message: types.Message, state: FSMContext):
     """Обработчик для получения названия нового города"""
     city = message.text
@@ -46,24 +50,30 @@ async def process_new_city(message: types.Message, state: FSMContext):
     if not base.get_city(city):
         base.create_table(city)
         await bot.send_message(message.from_user.id,
-                               text=f'Город {city} добавлен!',
+                               text=f'Город "{city}" добавлен!',
                                reply_markup=city_add)
         await state.finish()
     else:
         await bot.send_message(chat_id=message.from_user.id,
-                               text=f'Город {city} уже добавлен!',
+                               text=f'Город "{city}" уже добавлен!',
                                reply_markup=back)
         await state.finish()
 
-@dp.callback_query_handler(lambda c: c.data == 'back', state='*')
+
+@dp.callback_query_handler(lambda c: c.data.startswith('back'), state='*')
 async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     """Выйти из FSM"""
     await callback.answer()
     await state.finish()
-    await bot.edit_message_text(chat_id=callback.from_user.id,
-                                message_id=callback.message.message_id,
-                                text='Привет! Это бот. Тут приветственное сообщение',
-                                reply_markup=start)
+    if callback.data == 'back':
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text='Привет! Это бот. Тут приветственное сообщение',
+                                    reply_markup=start)
+    else:
+        await bot.send_message(chat_id=callback.from_user.id,
+                               text='Привет! Это бот. Тут приветственное сообщение',
+                               reply_markup=start)
 
 @dp.message_handler(commands=['config'])
 async def config(message: types.Message):
@@ -76,6 +86,7 @@ async def config(message: types.Message):
         await bot.send_message(chat_id=message.from_user.id,
                                text='🚫 Нет доступа 🚫',
                                reply_markup=back)
+
 
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
 async def city_callback(callback: types.CallbackQuery, state: FSMContext):
@@ -97,6 +108,7 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
                                     text=f'Выбран город: {city_name}. Приступить к работе?',
                                     reply_markup=ready_to_work)
 
+
 @dp.callback_query_handler(lambda c: c.data == 'jobs', state='*')
 async def jobs(callback: types.CallbackQuery, state: FSMContext):
     """Работа с заданиями"""
@@ -105,6 +117,7 @@ async def jobs(callback: types.CallbackQuery, state: FSMContext):
                                 message_id=callback.message.message_id,
                                 text='Введите операцию:',
                                 reply_markup=jobs_config)
+
 
 @dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
 async def delete_city(callback: types.CallbackQuery, state: FSMContext):
@@ -123,6 +136,8 @@ async def delete_city(callback: types.CallbackQuery, state: FSMContext):
                                     text=f'Ошибка удаления города: {current_city}',
                                     reply_markup=back)
     await state.finish()
+
+
 @dp.callback_query_handler(lambda c: c.data == 'new_job')
 async def new_job(callback: types.CallbackQuery, state: FSMContext):
     """Добавление новых заданий"""
@@ -135,6 +150,7 @@ async def new_job(callback: types.CallbackQuery, state: FSMContext):
                            reply_markup=back)
     await state.set_state(Job.image)
 
+
 @dp.message_handler(content_types=types.ContentType.PHOTO, state=Job.image)
 async def process_image(message: types.Message, state: FSMContext):
     """Получение картинки"""
@@ -144,13 +160,13 @@ async def process_image(message: types.Message, state: FSMContext):
     await state.set_state(Job.text)
     await message.reply('Введите идентификатор задания:')
 
+
 @dp.message_handler(state=Job.text)
 async def save_job(message: types.Message, state: FSMContext):
     """Идентификатор для задания и сохранение в базу данных"""
     async with state.proxy() as data:
         data['text'] = message.text
         current_city = data.get('current_city')
-        print(current_city)
         if not base.get_job(current_city, data['text']):
             base.new_job(current_city, data['image'], data['text'], status=1)
             await bot.send_message(message.from_user.id, 'Задание добавлено',
@@ -160,6 +176,7 @@ async def save_job(message: types.Message, state: FSMContext):
                                    f'Задание с id: {data["text"]} уже добавлено',
                                    reply_markup=job_add)
         await state.finish()
+
 
 @dp.callback_query_handler(lambda c: c.data == 'get_job')
 async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
@@ -175,6 +192,22 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
                                 reply_markup=jobs_kb)
 
 
+@dp.callback_query_handler(lambda c: c.data.startswith('job_'))
+async def jods_view(callback: types.CallbackQuery, state: FSMContext):
+    """Работа с выбранным заданием"""
+    await callback.answer()
+    job_id = callback.data.replace('job_', '')
+    await state.set_state()
+    state_data = await state.get_data()
+    city = state_data.get('current_city')
+    photo = base.get_photo(city, job_id)
+
+    await bot.send_photo(chat_id=callback.from_user.id,
+                         photo=photo[0],
+                         caption=f'Выбрано задание с идентификатором {job_id}',
+                         reply_markup=kb_job_photo)
+
+
 @dp.callback_query_handler(lambda c: c.data == 'correct_job')
 async def correct_job(callback: types.CallbackQuery):
     """Редактирование заданий"""
@@ -183,6 +216,7 @@ async def correct_job(callback: types.CallbackQuery):
                                 message_id=callback.message.message_id,
                                 text='Введите идентификатор задания:',
                                 reply_markup=back)
+
 
 @dp.callback_query_handler(lambda c: c.data == 'job_start', state='*')
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
@@ -209,6 +243,7 @@ async def first_report(message: types.Message, state: FSMContext):
                            text='Фото добавлено. Нажмите "Начать", чтобы приступить к работе',
                            reply_markup=start_working
                            )
+
 
 @dp.callback_query_handler(lambda c: c.data == 'start_work', state=User.start_working)
 async def started_work(callback: types.CallbackQuery, state: FSMContext):

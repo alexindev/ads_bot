@@ -7,3 +7,7 @@ class Job(StatesGroup):
 class User(StatesGroup):
     first_report = State()
     start_working = State()
+
+class City(StatesGroup):
+    city = State()
+

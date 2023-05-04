@@ -1,9 +1,10 @@
+import psycopg2
 from aiogram import Bot, types
 from loguru import logger
 
 from config import TOKEN, SERVER_URL
 from aiohttp import web
-from bot import bot, dp
+from loader import bot, dp, base
 
 
 Bot.set_current(bot)
@@ -32,6 +33,10 @@ async def handle_webhook(request):
         json_data = await request.json()
         update = types.Update(**json_data)
         await dp.process_update(update)
+        return web.Response()
+    except psycopg2.Error as e:
+        base.rollback()
+        logger.error(e)
         return web.Response()
     except Exception as e:
         logger.error(e)

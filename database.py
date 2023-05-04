@@ -26,6 +26,10 @@ class Database:
             )
         self._conn.commit()
 
+    def rollback(self):
+        """Откатить транзакцию"""
+        self._conn.rollback()
+
     def get_cities(self):
         """Получить все города"""
         with self._conn.cursor() as cur:
@@ -71,3 +75,15 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT text FROM "{city}"')
             return cur.fetchall()
+
+    def get_photo(self, city, text):
+        """Получить фото задания"""
+        with self._conn.cursor() as cur:
+            cur.execute(f'SELECT image FROM "{city}" WHERE text=%s', (text,))
+            return cur.fetchone()
+
+    def delete_job(self, city, text):
+        """Удалить задание"""
+        with self._conn.cursor() as cur:
+            cur.execute(f'DELETE FROM "{city}" WHERE text=%s', (text,))
+            self._conn.commit()
