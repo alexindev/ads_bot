@@ -1,10 +1,10 @@
 from aiogram import types, Dispatcher, Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
-from database import Database
+from db.database import Database
 from config import TOKEN, ADMINS
-from states import *
-from kb import *
+from States.states import *
+from keyboard.kb import *
 
 bot = Bot(TOKEN)
 storage = MemoryStorage()
@@ -110,6 +110,66 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
                                     reply_markup=ready_to_work)
 
 
+@dp.callback_query_handler(lambda c: c.data == 'start_job', state='*')
+async def start_work(callback: types.CallbackQuery, state: FSMContext):
+    """Подготовка к работе пользователя"""
+    await callback.answer()
+    data = await state.get_data()
+    city = data.get('current_city')
+    job_photo = base.get_job_photo(city)
+
+    if job_photo:
+        await bot.send_photo(chat_id=callback.from_user.id,
+                             photo=job_photo[0],
+                             caption=f'Вам присвоен участок # {job_photo[1]}\n'
+                                     'Перед началом работы необходимо отправить фотоотчет.\n'
+                                     'Прикрепите фото к этому сообщению',
+                             reply_markup=back_new)
+        await state.set_state(User.first_report)
+    else:
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text='На данный момент нет доступных маршрутов',
+                                    reply_markup=back)
+        await state.finish()
+
+
+@dp.message_handler(content_types=types.ContentType.PHOTO, state=User.first_report)
+async def first_report(message: types.Message, state: FSMContext):
+    """Получить фотоотчет о начале работы"""
+    async with state.proxy() as data:
+        data['first_report_image'] = message.photo[0].file_id
+
+    """Отправить фото в канал по отчетам"""
+
+    await bot.send_message(chat_id=message.from_user.id,
+                           text='Фото добавлено. Нажмите "Начать", чтобы приступить к работе',
+                           reply_markup=start_working
+                           )
+    await state.set_state(User.start_working)
+
+
+@dp.callback_query_handler(lambda c: c.data == 'start_work', state=User.start_working)
+async def started_work(callback: types.CallbackQuery, state: FSMContext):
+    """Ожидание получения финального отчета"""
+    await callback.answer()
+    await state.set_state(User.get_report)
+
+    await bot.edit_message_text(chat_id=callback.from_user.id,
+                                message_id=callback.message.message_id,
+                                text='После завершения работы необходимо написать отчет по шаблону из примера на фото\n',
+                                )
+    with open('images/template.jpg', 'rb') as photo:
+        await bot.send_photo(chat_id=callback.from_user.id, photo=types.InputFile(photo), reply_markup=back_new)
+
+
+@dp.message_handler(state=User.get_report)
+async def end_work(message: types.Message, state: FSMContext):
+    user_text = message.text
+    print(user_text)
+    await state.finish()
+
+
 @dp.callback_query_handler(lambda c: c.data == 'jobs')
 async def jobs(callback: types.CallbackQuery):
     """Работа с заданиями"""
@@ -156,7 +216,7 @@ async def process_image(message: types.Message, state: FSMContext):
         data['image'] = message.photo[0].file_id
 
     await state.set_state(Job.text)
-    await message.reply('Введите идентификатор задания:')
+    await message.reply('Введите идентификатор маршрута:')
 
 
 @dp.message_handler(state=Job.text)
@@ -167,11 +227,11 @@ async def save_job(message: types.Message, state: FSMContext):
         current_city = data.get('current_city')
         if not base.get_job(current_city, data['text']):
             base.new_job(current_city, data['image'], data['text'], status=1)
-            await bot.send_message(message.from_user.id, 'Задание добавлено',
+            await bot.send_message(message.from_user.id, 'Маршрут добавлен',
                                    reply_markup=job_add)
         else:
             await bot.send_message(message.from_user.id,
-                                   f'Задание с id: {data["text"]} уже добавлено',
+                                   f'Маршрут с id: {data["text"]} уже добавлен',
                                    reply_markup=job_add)
         await state.finish()
 
@@ -186,7 +246,7 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
-                                text='Все задания:',
+                                text='Все маршруты:',
                                 reply_markup=jobs_kb)
 
 
@@ -206,7 +266,7 @@ async def jods_view(callback: types.CallbackQuery, state: FSMContext):
 
     await bot.send_photo(chat_id=callback.from_user.id,
                          photo=photo[0],
-                         caption=f'Выбрано задание с идентификатором {job_id}',
+                         caption=f'Выбран маршрут с идентификатором {job_id}',
                          reply_markup=kb_job_photo)
 
 
@@ -220,44 +280,5 @@ async def delete_job_fucn(callback: types.CallbackQuery, state: FSMContext):
     base.delete_job(city, job_id)
 
     await bot.send_message(chat_id=callback.from_user.id,
-                           text=f'Задание с идентификатором "{job_id}" удалено',
+                           text=f'Маршрут с идентификатором "{job_id}" удалено',
                            reply_markup=delete_job)
-
-
-@dp.callback_query_handler(lambda c: c.data == 'start_job', state='*')
-async def start_work(callback: types.CallbackQuery, state: FSMContext):
-    """Подготовка к работе пользователя"""
-    await callback.answer()
-    await bot.edit_message_text(chat_id=callback.from_user.id,
-                                message_id=callback.message.message_id,
-                                text='Перед началом работы необходимо отправить фотоотчет\n'
-                                     'Прикрепите фото к этому сообщению',
-                                reply_markup=back)
-    await state.set_state(User.first_report)
-
-
-@dp.message_handler(content_types=types.ContentType.PHOTO, state=User.first_report)
-async def first_report(message: types.Message, state: FSMContext):
-    """Получить фотоотчет о начале работы"""
-    async with state.proxy() as data:
-        data['first_report_image'] = message.photo[0].file_id
-
-    """Отправить фото в канал по отчетам"""
-
-    await state.set_state(User.start_working)
-    await bot.send_message(chat_id=message.from_user.id,
-                           text='Фото добавлено. Нажмите "Начать", чтобы приступить к работе',
-                           reply_markup=start_working
-                           )
-
-
-@dp.callback_query_handler(lambda c: c.data == 'start_work', state=User.start_working)
-async def started_work(callback: types.CallbackQuery, state: FSMContext):
-    """Ожидание получения финального отчета"""
-    await callback.answer()
-    await bot.edit_message_text(chat_id=callback.from_user.id,
-                                message_id=callback.message.message_id,
-                                text='После завершения работы необходимо написать отчет по шаблону из примера на фото\n',
-                                )
-    with open('images/template.jpg', 'rb') as photo:
-        await bot.send_photo(chat_id=callback.from_user.id, photo=types.InputFile(photo), reply_markup=back)

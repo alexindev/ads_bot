@@ -9,6 +9,10 @@ back = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
+back_new = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Отмена', callback_data='back_new')
+)
+
 config_kb = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить город', callback_data='new_city'),
     InlineKeyboardButton(text='Другие настройки', callback_data='other_config'),
@@ -31,14 +35,14 @@ city_add = InlineKeyboardMarkup(row_width=1).add(
 )
 
 admim_city_config = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Задания', callback_data='jobs'),
+    InlineKeyboardButton(text='Маршруты', callback_data='jobs'),
     InlineKeyboardButton(text='Удалить город', callback_data='delete_city'),
     InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
 jobs_config = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Получить все задания', callback_data='get_job'),
-    InlineKeyboardButton(text='Добавить', callback_data='new_job'),
+    InlineKeyboardButton(text='Получить все маршруты', callback_data='get_job'),
+    InlineKeyboardButton(text='Добавить маршрут', callback_data='new_job'),
     InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
@@ -48,7 +52,7 @@ first_report = InlineKeyboardMarkup(row_width=1).add(
 )
 
 job_add = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Добавить новое задание', callback_data='new_job'),
+    InlineKeyboardButton(text='Добавить новый маршрут', callback_data='new_job'),
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 

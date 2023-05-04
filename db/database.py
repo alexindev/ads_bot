@@ -71,13 +71,13 @@ class Database:
             return cur.fetchone()
 
     def get_all_jobs(self, city):
-        """Получить все задания из текущего города"""
+        """Получить все маршруты из текущего города"""
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT text FROM "{city}"')
             return cur.fetchall()
 
     def get_photo(self, city, text):
-        """Получить фото задания"""
+        """Получить фото маршрута"""
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT image FROM "{city}" WHERE text=%s', (text,))
             return cur.fetchone()
@@ -87,3 +87,9 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(f'DELETE FROM "{city}" WHERE text=%s', (text,))
             self._conn.commit()
+
+    def get_job_photo(self, city, status=1):
+        """Получить маршрут для работника"""
+        with self._conn.cursor() as cur:
+            cur.execute(f'SELECT image, text FROM "{city}" WHERE status=%s', (status,))
+            return cur.fetchone()
