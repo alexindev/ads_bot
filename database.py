@@ -65,3 +65,9 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT * FROM "{city}" WHERE text=%s', (text,))
             return cur.fetchone()
+
+    def get_all_jobs(self, city):
+        """Получить все задания из текущего города"""
+        with self._conn.cursor() as cur:
+            cur.execute(f'SELECT text FROM "{city}"')
+            return cur.fetchall()

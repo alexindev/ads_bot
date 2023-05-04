@@ -31,14 +31,25 @@ city_add = InlineKeyboardMarkup(row_width=1).add(
 )
 
 admim_city_config = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Добавить задания', callback_data='new_job'),
+    InlineKeyboardButton(text='Задания', callback_data='jobs'),
     InlineKeyboardButton(text='Удалить город', callback_data='delete_city'),
-    InlineKeyboardButton(text='Назад', callback_data='back')
+    InlineKeyboardButton(text='Отмена', callback_data='back')
+)
+
+jobs_config = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Получить все задания', callback_data='get_job'),
+    InlineKeyboardButton(text='Добавить', callback_data='new_job'),
+    InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
 first_report = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Сделать фотоотчет', callback_data='first_report'),
     InlineKeyboardButton(text='Отмена', callback_data='back')
+)
+
+job_add = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Добавить новое задание', callback_data='new_job'),
+    InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
 def get_cities_keyboard(db):
@@ -47,5 +58,14 @@ def get_cities_keyboard(db):
     kb = InlineKeyboardMarkup(row_width=1)
     for city in cities:
         kb.add(InlineKeyboardButton(text=city[0], callback_data=f"city_{city[0]}"))
+    kb.add(InlineKeyboardButton(text='Назад', callback_data='back'))
+    return kb
+
+def get_jobs_kb(db, city):
+    """Кнопки со всеми заданиями"""
+    jobs = db.get_all_jobs(city)
+    kb = InlineKeyboardMarkup(row_width=1)
+    for job in jobs:
+        kb.add(InlineKeyboardButton(text=job[0], callback_data=f"{job[0]}"))
     kb.add(InlineKeyboardButton(text='Назад', callback_data='back'))
     return kb

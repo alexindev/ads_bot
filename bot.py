@@ -18,7 +18,6 @@ async def start_command_handler(message: types.Message):
                            text='Привет! Это бот. Тут приветственное сообщение',
                            reply_markup=start)
 
-
 @dp.callback_query_handler(lambda c: c.data == 'cities_list')
 async def choise_city(callback: types.CallbackQuery):
     """Вывести все города в инлайн кнопках"""
@@ -29,7 +28,6 @@ async def choise_city(callback: types.CallbackQuery):
                                 text='Выберите город:',
                                 reply_markup=cities)
 
-
 @dp.callback_query_handler(lambda c: c.data == 'new_city')
 async def new_city(callback: types.CallbackQuery, state: FSMContext):
     """Добавить новый город"""
@@ -39,7 +37,6 @@ async def new_city(callback: types.CallbackQuery, state: FSMContext):
                                 message_id=callback.message.message_id,
                                 text='Название нового города:',
                                 reply_markup=back)
-
 
 @dp.message_handler(state='new_city')
 async def process_new_city(message: types.Message, state: FSMContext):
@@ -58,7 +55,6 @@ async def process_new_city(message: types.Message, state: FSMContext):
                                reply_markup=back)
         await state.finish()
 
-
 @dp.callback_query_handler(lambda c: c.data == 'back', state='*')
 async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     """Выйти из FSM"""
@@ -68,7 +64,6 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
                                 message_id=callback.message.message_id,
                                 text='Привет! Это бот. Тут приветственное сообщение',
                                 reply_markup=start)
-
 
 @dp.message_handler(commands=['config'])
 async def config(message: types.Message):
@@ -81,7 +76,6 @@ async def config(message: types.Message):
         await bot.send_message(chat_id=message.from_user.id,
                                text='🚫 Нет доступа 🚫',
                                reply_markup=back)
-
 
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
 async def city_callback(callback: types.CallbackQuery, state: FSMContext):
@@ -103,10 +97,96 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
                                     text=f'Выбран город: {city_name}. Приступить к работе?',
                                     reply_markup=ready_to_work)
 
+@dp.callback_query_handler(lambda c: c.data == 'jobs', state='*')
+async def jobs(callback: types.CallbackQuery, state: FSMContext):
+    """Работа с заданиями"""
+    await callback.answer()
+    await bot.edit_message_text(chat_id=callback.from_user.id,
+                                message_id=callback.message.message_id,
+                                text='Введите операцию:',
+                                reply_markup=jobs_config)
+
+@dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
+async def delete_city(callback: types.CallbackQuery, state: FSMContext):
+    """Удаление города"""
+    data = await state.get_data()
+    current_city = data.get('current_city')
+
+    if base.delete_city(current_city):
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text=f'Город: {current_city} удален',
+                                    reply_markup=back)
+    else:
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text=f'Ошибка удаления города: {current_city}',
+                                    reply_markup=back)
+    await state.finish()
+@dp.callback_query_handler(lambda c: c.data == 'new_job')
+async def new_job(callback: types.CallbackQuery, state: FSMContext):
+    """Добавление новых заданий"""
+    await callback.answer()
+    async with state.proxy() as data:
+        current_city = data.get('current_city')
+
+    await bot.send_message(callback.from_user.id,
+                           text='Отправьте картинку:',
+                           reply_markup=back)
+    await state.set_state(Job.image)
+
+@dp.message_handler(content_types=types.ContentType.PHOTO, state=Job.image)
+async def process_image(message: types.Message, state: FSMContext):
+    """Получение картинки"""
+    async with state.proxy() as data:
+        data['image'] = message.photo[0].file_id
+
+    await state.set_state(Job.text)
+    await message.reply('Введите идентификатор задания:')
+
+@dp.message_handler(state=Job.text)
+async def save_job(message: types.Message, state: FSMContext):
+    """Идентификатор для задания и сохранение в базу данных"""
+    async with state.proxy() as data:
+        data['text'] = message.text
+        current_city = data.get('current_city')
+        print(current_city)
+        if not base.get_job(current_city, data['text']):
+            base.new_job(current_city, data['image'], data['text'], status=1)
+            await bot.send_message(message.from_user.id, 'Задание добавлено',
+                                   reply_markup=job_add)
+        else:
+            await bot.send_message(message.from_user.id,
+                                   f'Задание с id: {data["text"]} уже добавлено',
+                                   reply_markup=job_add)
+        await state.finish()
+
+@dp.callback_query_handler(lambda c: c.data == 'get_job')
+async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
+    """Получить все задания"""
+    await callback.answer()
+    state_data = await state.get_data()
+    city = state_data.get('current_city')
+    jobs_kb = get_jobs_kb(base, city)
+
+    await bot.edit_message_text(chat_id=callback.from_user.id,
+                                message_id=callback.message.message_id,
+                                text='Все задания:',
+                                reply_markup=jobs_kb)
+
+
+@dp.callback_query_handler(lambda c: c.data == 'correct_job')
+async def correct_job(callback: types.CallbackQuery):
+    """Редактирование заданий"""
+    await callback.answer()
+    await bot.edit_message_text(chat_id=callback.from_user.id,
+                                message_id=callback.message.message_id,
+                                text='Введите идентификатор задания:',
+                                reply_markup=back)
 
 @dp.callback_query_handler(lambda c: c.data == 'job_start', state='*')
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
-    """Подготовка к работе"""
+    """Подготовка к работе пользователя"""
     await callback.answer()
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
@@ -124,11 +204,11 @@ async def first_report(message: types.Message, state: FSMContext):
 
     """Отправить фото в канал по отчетам"""
 
+    await state.set_state(User.start_working)
     await bot.send_message(chat_id=message.from_user.id,
                            text='Фото добавлено. Нажмите "Начать", чтобы приступить к работе',
                            reply_markup=start_working
                            )
-    await state.set_state(User.start_working)
 
 @dp.callback_query_handler(lambda c: c.data == 'start_work', state=User.start_working)
 async def started_work(callback: types.CallbackQuery, state: FSMContext):
@@ -140,58 +220,3 @@ async def started_work(callback: types.CallbackQuery, state: FSMContext):
                                 )
     with open('images/template.jpg', 'rb') as photo:
         await bot.send_photo(chat_id=callback.from_user.id, photo=types.InputFile(photo), reply_markup=back)
-
-
-@dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
-async def delete_city(callback: types.CallbackQuery, state: FSMContext):
-    """Удаление города"""
-    data = await state.get_data()
-    current_city = data.get('current_city')
-    if base.delete_city(current_city):
-        await bot.edit_message_text(chat_id=callback.from_user.id,
-                                    message_id=callback.message.message_id,
-                                    text=f'Город: {current_city} удален',
-                                    reply_markup=back)
-    else:
-        await bot.edit_message_text(chat_id=callback.from_user.id,
-                                    message_id=callback.message.message_id,
-                                    text=f'Ошибка удаления города: {current_city}',
-                                    reply_markup=back)
-
-
-@dp.callback_query_handler(lambda c: c.data == 'new_job')
-async def new_job(callback: types.CallbackQuery, state: FSMContext):
-    """Добавление новых заданий"""
-    await callback.answer()
-    async with state.proxy() as data:
-        data['city'] = callback.message.text.split(' ')[-1]
-    await bot.send_message(callback.from_user.id,
-                           text='Отправьте картинку:',
-                           reply_markup=back)
-    await state.set_state(Job.image)
-
-
-@dp.message_handler(content_types=types.ContentType.PHOTO, state=Job.image)
-async def process_image(message: types.Message, state: FSMContext):
-    """Получение картинки"""
-    async with state.proxy() as data:
-        data['image'] = message.photo[0].file_id
-    await message.reply('Введите идентификатор задания:')
-    await state.set_state(Job.text)
-
-
-@dp.message_handler(state=Job.text)
-async def save_job(message: types.Message, state: FSMContext):
-    """Идентификатор для задания и сохранение в базу данных"""
-    async with state.proxy() as data:
-        data['text'] = message.text
-
-    await state.finish()
-    if not base.get_job(data['city'], data['text']):
-        base.new_job(data['city'], data['image'], data['text'], status=1)
-        await bot.send_message(message.from_user.id, 'Скрин добавлен',
-                               reply_markup=back)
-    else:
-        await bot.send_message(message.from_user.id,
-                               f'Скрин с id: {data["text"]} уже добавлен',
-                               reply_markup=back)
