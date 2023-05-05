@@ -88,7 +88,7 @@ class Database:
             cur.execute(f'DELETE FROM "{city}" WHERE text=%s', (text,))
             self._conn.commit()
 
-    def get_job_photo(self, city, status=1):
+    def get_job_photo_id(self, city, status):
         """Получить маршрут для работника"""
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT image, text FROM "{city}" WHERE status=%s', (status,))
@@ -99,5 +99,13 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(
                 f'UPDATE "{city}" SET status=%s WHERE text=%s', (status, text,)
+            )
+            self._conn.commit()
+
+    def update_status(self, city, status):
+        """Обновить статус для всех маршрутов"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                f'UPDATE "{city}" SET status=%s', (status,)
             )
             self._conn.commit()

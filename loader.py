@@ -145,7 +145,7 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         city = data.get('current_city')
 
-    job = base.get_job_photo(city)
+    job = base.get_job_photo_id(city, status=1)
 
     if job:
         async with state.proxy() as data:
@@ -166,8 +166,9 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
     else:
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
-                                    text='На данный момент нет доступных маршрутов',
+                                    text='На данный момент нет доступных маршрутов, повторите попытку позже',
                                     reply_markup=back)
+        base.update_status(city, status=1)
         await state.finish()
 
 
