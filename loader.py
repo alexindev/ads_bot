@@ -1,9 +1,13 @@
+import asyncio
+from datetime import datetime, timedelta
+
 from aiogram import types, Dispatcher, Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
+
 from db.database import Database
 from config import TOKEN, ADMINS, GROUP_CHAT_ID
-from States.states import *
+from state.states import *
 from keyboard.kb import *
 
 bot = Bot(TOKEN, parse_mode='HTML')
@@ -114,20 +118,28 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
     """Подготовка к работе пользователя"""
     await callback.answer()
-    data = await state.get_data()
-    city = data.get('current_city')
-    job_photo = base.get_job_photo(city)
 
-    if job_photo:
+    async with state.proxy() as data:
+        city = data.get('current_city')
+
+    job = base.get_job_photo(city)
+
+    if job:
         async with state.proxy() as data:
-            data['job_id'] = job_photo[1]
+            data['job_id'] = job[1]
+
+        base.update_job_status(city, job[1], status=0)
         await bot.send_photo(chat_id=callback.from_user.id,
-                             photo=job_photo[0],
-                             caption=f'Вам присвоен участок # {job_photo[1]}\n'
+                             photo=job[0],
+                             caption=f'Вам присвоен участок # {job[1]}\n'
                                      'Перед началом работы необходимо отправить фотоотчет.\n'
                                      'Прикрепите фото к этому сообщению',
                              reply_markup=back_new)
         await state.set_state(User.first_report)
+
+        # Время на принятие решения работником
+        asyncio.create_task(check_state_timeout(state, city, job[1], callback, params='confirm'))
+
     else:
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
@@ -141,11 +153,16 @@ async def first_report(message: types.Message, state: FSMContext):
     """Получить фотоотчет о начале работы"""
     async with state.proxy() as data:
         data['first_report_image'] = message.photo[0].file_id
+        city = data.get('current_city')
+        job_id = data.get('job_id')
 
     await bot.send_message(chat_id=message.from_user.id,
                            text='Фото добавлено. Нажмите "Начать", чтобы приступить к работе',
                            reply_markup=start_working
                            )
+
+    # Время на принятие решения работником
+    asyncio.create_task(check_state_timeout(state, city, job_id, message, params='start'))
 
     await state.set_state(User.start_working)
 
@@ -154,10 +171,10 @@ async def first_report(message: types.Message, state: FSMContext):
 async def started_work(callback: types.CallbackQuery, state: FSMContext):
     """Начало работы работника"""
     await callback.answer()
-
-    job_id = (await state.get_data()).get('job_id')
-    job_photo = (await state.get_data()).get('first_report_image')
-    city = (await state.get_data()).get('current_city')
+    async with state.proxy() as data:
+        job_id = data.get('job_id')
+        job_photo = data.get('first_report_image')
+        city = data.get('current_city')
 
     await bot.send_photo(chat_id=GROUP_CHAT_ID,
                          photo=job_photo,
@@ -175,8 +192,6 @@ async def started_work(callback: types.CallbackQuery, state: FSMContext):
                              photo=types.InputFile(photo),
                              reply_markup=user_send_report)
 
-    # await state.set_state(User.get_report)
-
 
 @dp.callback_query_handler(lambda c: c.data == 'send_report', state='*')
 async def report_work(callback: types.CallbackQuery, state: FSMContext):
@@ -193,8 +208,9 @@ async def report_work(callback: types.CallbackQuery, state: FSMContext):
 async def save_report(message: types.Message, state: FSMContext):
     """Текстовый отчет от работника. Пересылка в канал"""
     report = message.text
-    city = (await state.get_data()).get('current_city')
-    job_id = (await state.get_data()).get('job_id')
+    async with state.proxy() as data:
+        job_id = data.get('job_id')
+        city = data.get('current_city')
 
     await bot.send_message(chat_id=GROUP_CHAT_ID,
                            text=f'Отчет от работника <a href="tg://user?id={message.from_user.id}">{message.from_user.full_name}</a>\n'
@@ -206,13 +222,15 @@ async def save_report(message: types.Message, state: FSMContext):
                            reply_markup=user_new_report
                            )
 
+
 @dp.callback_query_handler(lambda c: c.data == 'end_work_job', state='*')
 async def end_work(callback: types.CallbackQuery, state: FSMContext):
     """Завершается маршрут"""
     await callback.answer()
 
-    city = (await state.get_data()).get('current_city')
-    job_id = (await state.get_data()).get('job_id')
+    async with state.proxy() as data:
+        job_id = data.get('job_id')
+        city = data.get('current_city')
 
     await bot.send_message(chat_id=GROUP_CHAT_ID,
                            text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
@@ -225,6 +243,7 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
                                 text='Маршрут завершен',
                                 reply_markup=back)
     await state.finish()
+
 
 @dp.callback_query_handler(lambda c: c.data == 'jobs')
 async def jobs(callback: types.CallbackQuery):
@@ -239,8 +258,8 @@ async def jobs(callback: types.CallbackQuery):
 @dp.callback_query_handler(lambda c: c.data == 'delete_city', state='*')
 async def delete_city(callback: types.CallbackQuery, state: FSMContext):
     """Удаление города"""
-    data = await state.get_data()
-    current_city = data.get('current_city')
+    async with state.proxy() as data:
+        current_city = data.get('current_city')
 
     if base.delete_city(current_city):
         await bot.edit_message_text(chat_id=callback.from_user.id,
@@ -281,23 +300,26 @@ async def save_job(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['text'] = message.text
         current_city = data.get('current_city')
-        if not base.get_job(current_city, data['text']):
-            base.new_job(current_city, data['image'], data['text'], status=1)
-            await bot.send_message(message.from_user.id, 'Маршрут добавлен',
-                                   reply_markup=job_add)
-        else:
-            await bot.send_message(message.from_user.id,
-                                   f'Маршрут с id: {data["text"]} уже добавлен',
-                                   reply_markup=job_add)
-        await state.finish()
+
+    if not base.get_job(current_city, data['text']):
+        base.new_job(current_city, data['image'], data['text'], status=1)
+        await bot.send_message(message.from_user.id, 'Маршрут добавлен',
+                               reply_markup=job_add)
+    else:
+        await bot.send_message(message.from_user.id,
+                               f'Маршрут с id: {data["text"]} уже добавлен',
+                               reply_markup=job_add)
+    await state.finish()
 
 
 @dp.callback_query_handler(lambda c: c.data == 'get_job')
 async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
     """Получить все задания"""
     await callback.answer()
-    state_data = await state.get_data()
-    city = state_data.get('current_city')
+
+    async with state.proxy() as data:
+        city = data.get('current_city')
+
     jobs_kb = get_jobs_kb(base, city)
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
@@ -310,13 +332,11 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
 async def jods_view(callback: types.CallbackQuery, state: FSMContext):
     """Работа с выбранным заданием"""
     await callback.answer()
-
     job_id = callback.data.replace('job_', '')
-    state_data = await state.get_data()
-    city = state_data.get('current_city')
 
     async with state.proxy() as data:
         data['job_id'] = job_id
+        city = data.get('current_city')
 
     photo = base.get_photo(city, job_id)
 
@@ -330,11 +350,43 @@ async def jods_view(callback: types.CallbackQuery, state: FSMContext):
 async def delete_job_fucn(callback: types.CallbackQuery, state: FSMContext):
     """Удалить задание"""
     await callback.answer()
-    data = await state.get_data()
-    city = data.get('current_city')
-    job_id = data.get('job_id')
+
+    async with state.proxy() as data:
+        city = data.get('current_city')
+        job_id = data.get('job_id')
+
     base.delete_job(city, job_id)
 
     await bot.send_message(chat_id=callback.from_user.id,
                            text=f'Маршрут с идентификатором "{job_id}" удалено',
                            reply_markup=delete_job)
+
+
+async def check_state_timeout(state: FSMContext, city: str, job_id: str, update, params):
+    # # Начинаем отсчет времени
+    start_time = datetime.now()
+    end_time = start_time + timedelta(seconds=300)
+
+    while datetime.now() < end_time:
+        # Проверяем каждую секунду, был ли переход в следующий хендлер
+        current_state = await state.get_state()
+
+        if params == 'confirm':
+            if current_state != User.first_report.state:
+                # Если перешли в следующий хендлер - выходим из цикла
+                break
+            await asyncio.sleep(1)
+
+        elif params == 'start':
+            if current_state != User.start_working.state:
+                # Если перешли в следующий хендлер - выходим из цикла
+                break
+            await asyncio.sleep(1)
+
+    else:
+        # Если прошло 5 минут и перехода в следующий хендлер не было - меняем статус на 1
+        base.update_job_status(city, job_id, status=1)
+        await bot.send_message(chat_id=update.from_user.id,
+                               text='Прошло 5 мин. Вы не начали работу. Маршрут отозван',
+                               reply_markup=back)
+        await state.finish()

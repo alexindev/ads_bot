@@ -15,7 +15,6 @@ back_new = InlineKeyboardMarkup(row_width=1).add(
 
 config_kb = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить город', callback_data='new_city'),
-    InlineKeyboardButton(text='Другие настройки', callback_data='other_config'),
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 

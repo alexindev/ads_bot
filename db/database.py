@@ -93,3 +93,11 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT image, text FROM "{city}" WHERE status=%s', (status,))
             return cur.fetchone()
+
+    def update_job_status(self, city, text, status):
+        """Обновить статус маршрута"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                f'UPDATE "{city}" SET status=%s WHERE text=%s', (status, text,)
+            )
+            self._conn.commit()
