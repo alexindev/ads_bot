@@ -6,7 +6,7 @@ start = InlineKeyboardMarkup(row_width=1).add(
 )
 
 back = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='На главную', callback_data='back')
+    InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
 back_new = InlineKeyboardMarkup(row_width=1).add(
@@ -57,7 +57,7 @@ job_add = InlineKeyboardMarkup(row_width=1).add(
 
 kb_job_photo = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Удалить', callback_data='delete_job_photo'),
-    InlineKeyboardButton(text='Назад', callback_data='back_new')
+    InlineKeyboardButton(text='Отмена', callback_data='back_new')
 )
 
 delete_job = InlineKeyboardMarkup(row_width=1).add(
