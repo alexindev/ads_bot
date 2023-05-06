@@ -6,7 +6,7 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
 
 from db.database import Database
-from config import TOKEN, ADMINS, GROUP_CHAT_ID
+from config import TOKEN, ADMINS, GROUP_CHAT_ID, USERS_GROUP
 from state.states import *
 from keyboard.kb import *
 
@@ -19,9 +19,10 @@ base = Database()
 
 @dp.message_handler(commands=['start'])
 async def start_command_handler(message: types.Message):
-    await bot.send_message(message.from_user.id,
-                           text='Привет! Это бот. Тут приветственное сообщение',
-                           reply_markup=start)
+    if await check_subsciber(message.from_user.id) or message.from_user.id in ADMINS:
+        await bot.send_message(message.from_user.id,
+                               text='Привет! Это бот. Тут приветственное сообщение',
+                               reply_markup=start)
 
 
 @dp.callback_query_handler(lambda c: c.data == 'cities_list')
@@ -106,10 +107,6 @@ async def config(message: types.Message):
         await bot.send_message(chat_id=message.from_user.id,
                                text='Меню настроек:',
                                reply_markup=config_kb)
-    else:
-        await bot.send_message(chat_id=message.from_user.id,
-                               text='🚫 Нет доступа 🚫',
-                               reply_markup=back)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
@@ -443,3 +440,15 @@ async def job_timeout(state: FSMContext, city: str, job_id: str, update):
                                text='Прошло 48 часов. Маршрут не завершен. Отмена маршрута',
                                reply_markup=back)
         await state.finish()
+
+async def check_subsciber(user_id) -> bool:
+    """Проверка участников групп"""
+    for group in USERS_GROUP:
+        try:
+            chat_member = await bot.get_chat_member(chat_id=group, user_id=user_id)
+            if chat_member.status == 'member':
+                return True
+        except Exception as e:
+            print(e)
+    return False
+
