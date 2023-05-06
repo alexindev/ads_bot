@@ -69,16 +69,34 @@ async def process_new_city(message: types.Message, state: FSMContext):
 async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     """Выйти из FSM"""
     await callback.answer()
-    await state.finish()
     if callback.data == 'back':
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
                                     text='Привет! Это бот. Тут приветственное сообщение',
                                     reply_markup=start)
-    else:
+        await state.finish()
+
+    elif callback.data == 'back_new':
         await bot.send_message(chat_id=callback.from_user.id,
                                text='Привет! Это бот. Тут приветственное сообщение',
                                reply_markup=start)
+        await state.finish()
+
+    elif callback.data == 'back_job':
+        async with state.proxy() as data:
+            city = data.get('current_city')
+            job_id = data.get('job_id')
+
+        base.update_job_status(city, job_id, status=1)
+        await bot.send_message(chat_id=callback.from_user.id,
+                               text='Маршрут отменен',
+                               reply_markup=start)
+        await bot.send_message(chat_id=GROUP_CHAT_ID,
+                               text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
+                                    f'Город: {city}\n'
+                                    f'Маршрут: # {job_id}\n'
+                               )
+        await state.finish()
 
 
 @dp.message_handler(commands=['config'])
@@ -139,7 +157,7 @@ async def delete_city(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query_handler(lambda c: c.data == 'start_job', state='*')
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
-    """Подготовка к работе пользователя"""
+    """Подготовка к работе"""
     await callback.answer()
 
     async with state.proxy() as data:
@@ -157,11 +175,13 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
                              caption=f'Вам присвоен участок # {job[1]}\n'
                                      'Перед началом работы необходимо отправить фотоотчет.\n'
                                      'Прикрепите фото к этому сообщению',
-                             reply_markup=back_new)
+                             reply_markup=back_job_cancel)
         await state.set_state(User.first_report)
 
         # Время на принятие решения работником
-        asyncio.create_task(check_state_timeout(state, city, job[1], callback, params='confirm'))
+        asyncio.create_task(check_state_timeout(state, city, job[1], callback, params='start'))
+
+        asyncio.create_task(job_timeout(state, city, job[1], callback))
 
     else:
         await bot.edit_message_text(chat_id=callback.from_user.id,
@@ -186,7 +206,7 @@ async def first_report(message: types.Message, state: FSMContext):
                            )
 
     # Время на принятие решения работником
-    asyncio.create_task(check_state_timeout(state, city, job_id, message, params='start'))
+    asyncio.create_task(check_state_timeout(state, city, job_id, message, params='confirm'))
 
     await state.set_state(User.start_working)
 
@@ -218,7 +238,7 @@ async def started_work(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(User.make_report)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'send_report', state='*')
+@dp.callback_query_handler(lambda c: c.data == 'send_report', state=User.make_report)
 async def report_work(callback: types.CallbackQuery, state: FSMContext):
     """Работа с отчетами работников"""
     await callback.answer()
@@ -243,12 +263,13 @@ async def save_report(message: types.Message, state: FSMContext):
                                 f'Маршрут: # {job_id}\n'
                                 f'{report}')
     await bot.send_message(message.from_user.id,
-                           text='Отчет принят',
+                           text='Отчет принят. Выберите действие: ',
                            reply_markup=user_new_report
                            )
+    await state.set_state(User.make_report)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'end_work_job', state='*')
+@dp.callback_query_handler(lambda c: c.data == 'end_work_job', state=User.make_report)
 async def end_work(callback: types.CallbackQuery, state: FSMContext):
     """Завершается маршрут"""
     await callback.answer()
@@ -267,7 +288,7 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
                                 message_id=callback.message.message_id,
                                 text='Маршрут завершен',
                                 reply_markup=back)
-    await state.finish()
+    await state.set_state(User.end_job)
 
 
 @dp.callback_query_handler(lambda c: c.data == 'jobs', state=Admin.job)
@@ -281,7 +302,7 @@ async def jobs(callback: types.CallbackQuery, state: FSMContext):
     await state.set_state(Admin.job_operation)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'get_job', state=Admin.job_operation)
+@dp.callback_query_handler(lambda c: c.data == 'get_job', state='*')
 async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
     """Получить все задания"""
     await callback.answer()
@@ -374,26 +395,51 @@ async def save_job(message: types.Message, state: FSMContext):
 
 async def check_state_timeout(state: FSMContext, city: str, job_id: str, update, params):
     # # Начинаем отсчет времени
-    end_time = time.time() + 300
+    end_time = time.time() + 18000
+
+    city = city
+    job_id = job_id
 
     while time.time() < end_time:
         current_state = await state.get_state()
 
-        if params == 'confirm':
-            if current_state != User.first_report.state:
+        if params == 'start':
+            if current_state == User.first_report.state:
                 # Если перешли в следующий хендлер - выходим из цикла
+                await asyncio.sleep(1)
+            else:
                 return
-            await asyncio.sleep(1)
 
-        elif params == 'start':
-            if current_state != User.start_working.state:
+        elif params == 'confirm':
+            if current_state == User.start_working.state:
                 # Если перешли в следующий хендлер - выходим из цикла
+                await asyncio.sleep(1)
+            else:
                 return
-            await asyncio.sleep(1)
+    else:
+        # Если прошло 5 часов и перехода в следующий хендлер не было - меняем статус на 1
+        base.update_job_status(city, job_id, status=1)
+        await bot.send_message(chat_id=update.from_user.id,
+                               text='Прошло 5 часов. Вы не начали работу. Маршрут отозван',
+                               reply_markup=back)
+        await state.finish()
 
-    # Если прошло 5 минут и перехода в следующий хендлер не было - меняем статус на 1
-    base.update_job_status(city, job_id, status=1)
-    await bot.send_message(chat_id=update.from_user.id,
-                           text='Прошло 5 мин. Вы не начали работу. Маршрут отозван',
-                           reply_markup=back)
-    await state.finish()
+
+async def job_timeout(state: FSMContext, city: str, job_id: str, update):
+    end_timer = time.time() + 172800
+
+    city = city
+    job_id = job_id
+
+    while time.time() < end_timer:
+        current_state = await state.get_state()
+
+        if current_state == User.end_job.state or current_state is None:
+            return
+        await asyncio.sleep(1)
+    else:
+        base.update_job_status(city, job_id, status=1)
+        await bot.send_message(chat_id=update.from_user.id,
+                               text='Прошло 48 часов. Маршрут не завершен. Отмена маршрута',
+                               reply_markup=back)
+        await state.finish()

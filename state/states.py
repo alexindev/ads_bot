@@ -10,6 +10,7 @@ class User(StatesGroup):
     get_report = State()
     make_report = State()
     send_report = State()
+    end_job = State()
 
 class City(StatesGroup):
     city = State()

@@ -13,6 +13,11 @@ back_new = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back_new')
 )
 
+back_job_cancel = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Отмена', callback_data='back_job')
+)
+
+
 config_kb = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить город', callback_data='new_city'),
     InlineKeyboardButton(text='Назад', callback_data='back')
@@ -25,7 +30,7 @@ ready_to_work = InlineKeyboardMarkup(row_width=2).add(
 
 start_working = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Начать', callback_data='start_work'),
-    InlineKeyboardButton(text='Отмена', callback_data='back')
+    InlineKeyboardButton(text='Отмена', callback_data='back_job')
 )
 
 city_add = InlineKeyboardMarkup(row_width=1).add(
@@ -57,7 +62,7 @@ job_add = InlineKeyboardMarkup(row_width=1).add(
 
 kb_job_photo = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Удалить', callback_data='delete_job_photo'),
-    InlineKeyboardButton(text='Отмена', callback_data='back_new')
+    InlineKeyboardButton(text='Назад', callback_data='get_job')
 )
 
 delete_job = InlineKeyboardMarkup(row_width=1).add(
@@ -67,7 +72,7 @@ delete_job = InlineKeyboardMarkup(row_width=1).add(
 
 user_send_report = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отправить отчет', callback_data='send_report'),
-    InlineKeyboardButton(text='Отменить', callback_data='back_new')
+    InlineKeyboardButton(text='Отменить', callback_data='back_job')
 )
 
 user_new_report = InlineKeyboardMarkup(row_width=1).add(
