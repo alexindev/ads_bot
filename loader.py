@@ -4,9 +4,10 @@ import time
 from aiogram import types, Dispatcher, Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
+from loguru import logger
 
 from db.database import Database
-from config import TOKEN, ADMINS, GROUP_CHAT_ID, USERS_GROUP
+from config import *
 from state.states import *
 from keyboard.kb import *
 
@@ -19,9 +20,9 @@ base = Database()
 
 @dp.message_handler(commands=['start'])
 async def start_command_handler(message: types.Message):
-    if await check_subsciber(message.from_user.id) or message.from_user.id in ADMINS:
+    if message.from_user.id in ADMINS or await check_subsciber(message.from_user.id):
         await bot.send_message(message.from_user.id,
-                               text='Привет! Это бот. Тут приветственное сообщение',
+                               text='Привет! Это бот, который поможет получить маршрут для работы!',
                                reply_markup=start)
 
 
@@ -73,13 +74,13 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     if callback.data == 'back':
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
-                                    text='Привет! Это бот. Тут приветственное сообщение',
+                                    text='Привет! Это бот, который поможет получить маршрут для работы!',
                                     reply_markup=start)
         await state.finish()
 
     elif callback.data == 'back_new':
         await bot.send_message(chat_id=callback.from_user.id,
-                               text='Привет! Это бот. Тут приветственное сообщение',
+                               text='Привет! Это бот, который поможет получить маршрут для работы!',
                                reply_markup=start)
         await state.finish()
 
@@ -92,11 +93,20 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
         await bot.send_message(chat_id=callback.from_user.id,
                                text='Маршрут отменен',
                                reply_markup=start)
-        await bot.send_message(chat_id=GROUP_CHAT_ID,
-                               text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
-                                    f'Город: {city}\n'
-                                    f'Маршрут: # {job_id}\n'
-                               )
+
+        group = await check_subscriber_group(callback.from_user.id)
+        if group == 'GROUP1':
+            await bot.send_message(chat_id=GROUP_CHAT_ID[0],
+                                   text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
+                                        f'Город: {city}\n'
+                                        f'Маршрут: # {job_id}\n'
+                                   )
+        elif group == 'GROUP2':
+            await bot.send_message(chat_id=GROUP_CHAT_ID[1],
+                                   text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
+                                        f'Город: {city}\n'
+                                        f'Маршрут: # {job_id}\n'
+                                   )
         await state.finish()
 
 
@@ -217,11 +227,19 @@ async def started_work(callback: types.CallbackQuery, state: FSMContext):
         job_photo = data.get('first_report_image')
         city = data.get('current_city')
 
-    await bot.send_photo(chat_id=GROUP_CHAT_ID,
-                         photo=job_photo,
-                         caption=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
-                                 f'Город: {city}\n'
-                                 f'Назначен участок: # {job_id}')
+    group = await check_subscriber_group(callback.from_user.id)
+    if group == 'GROUP1':
+        await bot.send_photo(chat_id=GROUP_CHAT_ID[0],
+                             photo=job_photo,
+                             caption=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
+                                     f'Город: {city}\n'
+                                     f'Назначен участок: # {job_id}')
+    elif group == 'GROUP2':
+        await bot.send_photo(chat_id=GROUP_CHAT_ID[1],
+                             photo=job_photo,
+                             caption=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
+                                     f'Город: {city}\n'
+                                     f'Назначен участок: # {job_id}')
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
@@ -254,11 +272,20 @@ async def save_report(message: types.Message, state: FSMContext):
         job_id = data.get('job_id')
         city = data.get('current_city')
 
-    await bot.send_message(chat_id=GROUP_CHAT_ID,
-                           text=f'Отчет от работника <a href="tg://user?id={message.from_user.id}">{message.from_user.full_name}</a>\n'
-                                f'Город: {city}\n'
-                                f'Маршрут: # {job_id}\n'
-                                f'{report}')
+    group = await check_subscriber_group(message.from_user.id)
+    if group == 'GROUP1':
+        await bot.send_message(chat_id=GROUP_CHAT_ID[0],
+                               text=f'Отчет от работника <a href="tg://user?id={message.from_user.id}">{message.from_user.full_name}</a>\n'
+                                    f'Город: {city}\n'
+                                    f'Маршрут: # {job_id}\n'
+                                    f'{report}')
+    elif group == 'GROUP2':
+        await bot.send_message(chat_id=GROUP_CHAT_ID[1],
+                               text=f'Отчет от работника <a href="tg://user?id={message.from_user.id}">{message.from_user.full_name}</a>\n'
+                                    f'Город: {city}\n'
+                                    f'Маршрут: # {job_id}\n'
+                                    f'{report}')
+
     await bot.send_message(message.from_user.id,
                            text='Отчет принят. Выберите действие: ',
                            reply_markup=user_new_report
@@ -275,11 +302,19 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
         job_id = data.get('job_id')
         city = data.get('current_city')
 
-    await bot.send_message(chat_id=GROUP_CHAT_ID,
-                           text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
-                                f'Город: {city}\n'
-                                f'Маршрут: # {job_id}\n'
-                           )
+    group = await check_subscriber_group(callback.from_user.id)
+    if group == 'GROUP1':
+        await bot.send_message(chat_id=GROUP_CHAT_ID[0],
+                               text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
+                                    f'Город: {city}\n'
+                                    f'Маршрут: # {job_id}\n'
+                               )
+    elif group == 'GROUP2':
+        await bot.send_message(chat_id=GROUP_CHAT_ID[1],
+                               text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
+                                    f'Город: {city}\n'
+                                    f'Маршрут: # {job_id}\n'
+                               )
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
@@ -443,12 +478,27 @@ async def job_timeout(state: FSMContext, city: str, job_id: str, update):
 
 async def check_subsciber(user_id) -> bool:
     """Проверка участников групп"""
-    for group in USERS_GROUP:
+    for group in USERS_GROUP1 + USERS_GROUP2:
         try:
             chat_member = await bot.get_chat_member(chat_id=group, user_id=user_id)
             if chat_member.status == 'member':
                 return True
         except Exception as e:
-            print(e)
+            logger.error(e)
     return False
 
+
+async def check_subscriber_group(user_id):
+    """Проверка группы подписчика"""
+    for group in USERS_GROUP1 + USERS_GROUP2:
+        try:
+            chat_member = await bot.get_chat_member(chat_id=group, user_id=user_id)
+            if chat_member.status == 'member':
+                if group in USERS_GROUP1:
+                    return "GROUP1"
+                elif group in USERS_GROUP2:
+                    return "GROUP2"
+        except Exception as e:
+            logger.error(e)
+    logger.error(f'Пользователь {user_id.from_user.full_name} не состоит ни в одной группе')
+    return None

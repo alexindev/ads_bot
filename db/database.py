@@ -1,7 +1,6 @@
 import psycopg2
 from loguru import logger
-
-from config import PG_BASE, PG_USER, PG_PASS
+from ads_bot.config import PG_BASE, PG_USER, PG_PASS
 
 
 class Database:
