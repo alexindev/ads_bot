@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+import aiogram.utils.exceptions
 from aiogram import types, Dispatcher, Bot
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher import FSMContext
@@ -24,6 +25,21 @@ async def start_command_handler(message: types.Message):
         await bot.send_message(message.from_user.id,
                                text='Привет! Это бот, который поможет получить маршрут для работы!',
                                reply_markup=start)
+
+@dp.message_handler(commands=['help'])
+async def help_cmd(message: types.Message):
+    if message.from_user.id in ADMINS or await check_subsciber(message.from_user.id):
+        await bot.send_message(message.from_user.id,
+                               text='<b>Памятки для работы с ботом:</b>\n\n'
+                                    'Для начала работы необходимо в главном меню выбрать свой город <b>кнопка "Выбрать город"</b>\n\n'
+                                    'После подтверждения начала работы назначится первый доступный маршрут\n\n'
+                                    'До начала работы будет интервал <b>5 часов</b>. Если за это время не приступить к работе, маршрут будет отменен\n\n'
+                                    'Перед началом работы, необходимо отправить фотоотчет со стартового адреса. <b>Прикрепить фото к соответсвующему сообщению</b>\n\n'
+                                    'После каждого прохождения каждого <b>5 дома</b> в маршруте нужно написать отчет от проделанной работе <b>кнопка "Отправить отчет"</b>\n\n'
+                                    'Для добавления нового отчета <b>кнопка "Отправить новый отчет"</b>\n\n'
+                                    'После отправки последнего отчета <b>кнопка "Завершить маршрут"</b>',
+
+                               reply_markup=back)
 
 
 @dp.callback_query_handler(lambda c: c.data == 'cities_list')
@@ -483,6 +499,8 @@ async def check_subsciber(user_id) -> bool:
             chat_member = await bot.get_chat_member(chat_id=group, user_id=user_id)
             if chat_member.status == 'member':
                 return True
+        except aiogram.utils.exceptions.ChatNotFound:
+            pass
         except Exception as e:
             logger.error(e)
     return False
