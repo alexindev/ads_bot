@@ -503,6 +503,7 @@ async def check_subsciber(user_id) -> bool:
             pass
         except Exception as e:
             logger.error(e)
+            return False
     return False
 
 
