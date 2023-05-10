@@ -12,7 +12,6 @@ from config import *
 from state.states import *
 from keyboard.kb import *
 
-
 bot = Bot(TOKEN, parse_mode='HTML')
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -25,6 +24,7 @@ async def start_command_handler(message: types.Message):
         await bot.send_message(message.from_user.id,
                                text='Привет! Это бот, который поможет получить маршрут для работы!',
                                reply_markup=start)
+
 
 @dp.message_handler(commands=['help'])
 async def help_cmd(message: types.Message):
@@ -357,13 +357,17 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         city = data.get('current_city')
 
-    jobs_kb = get_jobs_kb(base, city)
-
-    await bot.edit_message_text(chat_id=callback.from_user.id,
-                                message_id=callback.message.message_id,
-                                text='Все маршруты:',
-                                reply_markup=jobs_kb)
-    await state.set_state(Admin.jobs_list)
+    jobs_kb_list = get_jobs_kb(base, city)
+    if jobs_kb_list:
+        for jobs_kb in jobs_kb_list:
+            await bot.send_message(chat_id=callback.from_user.id,
+                                   text='Все маршруты:',
+                                   reply_markup=jobs_kb)
+        await state.set_state(Admin.jobs_list)
+    else:
+        await bot.send_message(chat_id=callback.from_user.id,
+                               text='Ни одного маршрута не добавлено',
+                               reply_markup=back_back)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('job_'), state=Admin.jobs_list)
@@ -491,6 +495,7 @@ async def job_timeout(state: FSMContext, city: str, job_id: str, update):
                                text='Прошло 48 часов. Маршрут не завершен. Отмена маршрута',
                                reply_markup=back)
         await state.finish()
+
 
 async def check_subsciber(user_id) -> bool:
     """Проверка участников групп"""

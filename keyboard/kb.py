@@ -9,6 +9,10 @@ back = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
+back_back = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Назад', callback_data='back')
+)
+
 back_new = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back_new')
 )
@@ -16,7 +20,6 @@ back_new = InlineKeyboardMarkup(row_width=1).add(
 back_job_cancel = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back_job')
 )
-
 
 config_kb = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить город', callback_data='new_city'),
@@ -89,11 +92,16 @@ def get_cities_keyboard(db):
     kb.add(InlineKeyboardButton(text='Назад', callback_data='back'))
     return kb
 
-def get_jobs_kb(db, city):
+def get_jobs_kb(db, city) -> list:
     """Кнопки со всеми заданиями"""
     jobs = db.get_all_jobs(city)
-    kb = InlineKeyboardMarkup(row_width=3)
-    for job in jobs:
-        kb.insert(InlineKeyboardButton(text=job[0], callback_data=f"job_{job[0]}"))
-    kb.add(InlineKeyboardButton(text='Назад', callback_data='back'))
-    return kb
+    kb_list = []
+    for i in range(0, len(jobs), 99):
+        kb = InlineKeyboardMarkup(row_width=4)
+        for job in jobs[i:i+99]:
+            kb.insert(InlineKeyboardButton(text=job[0], callback_data=f"job_{job[0]}"))
+        kb.add(InlineKeyboardButton(text='Назад', callback_data='back'))
+        kb_list.append(kb)
+    return kb_list
+
+
