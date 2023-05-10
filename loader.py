@@ -87,6 +87,7 @@ async def process_new_city(message: types.Message, state: FSMContext):
 async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     """Выйти из FSM"""
     await callback.answer()
+
     if callback.data == 'back':
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
@@ -95,9 +96,16 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
         await state.finish()
 
     elif callback.data == 'back_new':
+        user_data = base.get_user_data(callback.from_user.id)
+        job_id = user_data[0]
+        city = user_data[1]
+
         await bot.send_message(chat_id=callback.from_user.id,
                                text='Привет! Это бот, который поможет получить маршрут для работы!',
                                reply_markup=start)
+
+        base.update_job_status(city, job_id, status=1)
+        base.delete_user_data(callback.from_user.id)
         await state.finish()
 
     elif callback.data == 'back_job':
@@ -186,11 +194,16 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
     async with state.proxy() as data:
         city = data.get('current_city')
 
+    base.create_user_table()
+
     job = base.get_job_photo_id(city, status=1)
 
     if job:
         async with state.proxy() as data:
             data['job_id'] = job[1]
+
+        if not base.get_user_data(callback.from_user.id):
+            base.set_user_info(callback.from_user, city, job[1])
 
         base.update_job_status(city, job[1], status=0)
         await bot.send_photo(chat_id=callback.from_user.id,
@@ -198,7 +211,7 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
                              caption=f'Вам присвоен участок # {job[1]}\n'
                                      'Перед началом работы необходимо отправить фотоотчет.\n'
                                      'Прикрепите фото к этому сообщению',
-                             reply_markup=back_job_cancel)
+                             reply_markup=back_new)
         await state.set_state(User.first_report)
 
         # Время на принятие решения работником
@@ -522,6 +535,8 @@ async def check_subscriber_group(user_id):
                     return "GROUP1"
                 elif group in USERS_GROUP2:
                     return "GROUP2"
+        except aiogram.utils.exceptions.ChatNotFound:
+            pass
         except Exception as e:
             logger.error(e)
     logger.error(f'Пользователь {user_id.from_user.full_name} не состоит ни в одной группе')

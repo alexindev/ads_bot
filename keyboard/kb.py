@@ -17,9 +17,6 @@ back_new = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back_new')
 )
 
-back_job_cancel = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Отмена', callback_data='back_job')
-)
 
 config_kb = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить город', callback_data='new_city'),

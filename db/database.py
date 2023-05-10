@@ -25,6 +25,41 @@ class Database:
             )
         self._conn.commit()
 
+    def create_user_table(self):
+        """Таблица работников"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                '''CREATE TABLE IF NOT EXISTS users (
+                    user_id BIGINT PRIMARY_KEY,
+                    city VARCHAR(50),
+                    job_id VARCHAR(10)
+                '''
+            )
+        self._conn.commit()
+
+    def get_user_data(self, user_id):
+        """Информация о работнике"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'SELECT * FROM users WHERE user_id=%s', (user_id,)
+            )
+            return cur.fetchone()
+
+    def set_user_info(self, user_id, city, job_id):
+        """Записать данные рабоника"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'INSERT INTO users (user_id, city, job_id) VALUES (%s, %s, %s)',
+                (user_id, city, job_id))
+            self._conn.commit()
+
+    def delete_user_data(self, user_id):
+        """Удалить данные пользователя"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'DELETE FROM users WHERE user_id=%s', (user_id,))
+            self._conn.commit()
+
     def rollback(self):
         """Откатить транзакцию"""
         self._conn.rollback()
