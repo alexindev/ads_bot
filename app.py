@@ -11,6 +11,8 @@ Bot.set_current(bot)
 app = web.Application()
 
 webhook_path = f'/{TOKEN}'
+base.create_user_table()
+
 
 async def set_webhook():
     webhook_uri = f'{SERVER_URL}{webhook_path}'

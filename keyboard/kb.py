@@ -5,7 +5,7 @@ start = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Выбрать город', callback_data='cities_list'),
 )
 
-back = InlineKeyboardMarkup(row_width=1).add(
+back_cancel = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
@@ -13,13 +13,23 @@ back_back = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
-back_new = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Отмена', callback_data='back_new')
+back_main = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Вернуться на главную', callback_data='back')
 )
 
+to_work_ban = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Далее', callback_data='start_work'),
+    InlineKeyboardButton(text='Отмена', callback_data='back_ban')
+)
+
+mess_ban = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Продолжить работу', callback_data='continue_work'),
+    InlineKeyboardButton(text='Отменить маршрут', callback_data='back_ban')
+)
 
 config_kb = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить город', callback_data='new_city'),
+    InlineKeyboardButton(text='Обновить статусы', callback_data='update_status'),
     InlineKeyboardButton(text='Назад', callback_data='back')
 )
 
@@ -30,7 +40,12 @@ ready_to_work = InlineKeyboardMarkup(row_width=2).add(
 
 start_working = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Начать', callback_data='start_work'),
-    InlineKeyboardButton(text='Отмена', callback_data='back_job')
+    InlineKeyboardButton(text='Отмена', callback_data='back_ban')
+)
+
+user_send_report = InlineKeyboardMarkup(row_width=1).add(
+    InlineKeyboardButton(text='Завершить маршрут', callback_data='end_work_job'),
+    InlineKeyboardButton(text='Отменить', callback_data='mess_ban')
 )
 
 city_add = InlineKeyboardMarkup(row_width=1).add(
@@ -50,11 +65,6 @@ jobs_config = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Отмена', callback_data='back')
 )
 
-first_report = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Сделать фотоотчет', callback_data='first_report'),
-    InlineKeyboardButton(text='Отмена', callback_data='back')
-)
-
 job_add = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Добавить новый маршрут', callback_data='new_job'),
     InlineKeyboardButton(text='Назад', callback_data='back')
@@ -68,16 +78,6 @@ kb_job_photo = InlineKeyboardMarkup(row_width=1).add(
 delete_job = InlineKeyboardMarkup(row_width=1).add(
     InlineKeyboardButton(text='Назад', callback_data='get_job'),
     InlineKeyboardButton(text='На главную', callback_data='back')
-)
-
-user_send_report = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Отправить отчет', callback_data='send_report'),
-    InlineKeyboardButton(text='Отменить', callback_data='back_job')
-)
-
-user_new_report = InlineKeyboardMarkup(row_width=1).add(
-    InlineKeyboardButton(text='Отправить новый отчет', callback_data='send_report'),
-    InlineKeyboardButton(text='Завершить маршрут', callback_data='end_work_job')
 )
 
 def get_cities_keyboard(db):

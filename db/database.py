@@ -30,10 +30,11 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(
                 '''CREATE TABLE IF NOT EXISTS users (
-                    user_id BIGINT PRIMARY_KEY,
+                    user_id VARCHAR(20) PRIMARY KEY,
                     city VARCHAR(50),
-                    job_id VARCHAR(10)
-                '''
+                    job_id VARCHAR(10),
+                    status INTEGER
+                )'''
             )
         self._conn.commit()
 
@@ -45,19 +46,33 @@ class Database:
             )
             return cur.fetchone()
 
-    def set_user_info(self, user_id, city, job_id):
+    def set_user_info(self, user_id, city, job_id, status):
         """Записать данные рабоника"""
         with self._conn.cursor() as cur:
             cur.execute(
-                'INSERT INTO users (user_id, city, job_id) VALUES (%s, %s, %s)',
-                (user_id, city, job_id))
+                'INSERT INTO users (user_id, city, job_id, status) VALUES (%s, %s, %s, %s)',
+                (user_id, city, job_id, status))
             self._conn.commit()
 
-    def delete_user_data(self, user_id):
+    def delete_user_data(self, user_id: str):
         """Удалить данные пользователя"""
         with self._conn.cursor() as cur:
             cur.execute(
                 'DELETE FROM users WHERE user_id=%s', (user_id,))
+            self._conn.commit()
+
+    def update_user_status(self, user_id: str, status: int):
+        """Обновить статус пользователя"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'UPDATE users SET status=%s WHERE user_id=%s', (status, user_id,))
+            self._conn.commit()
+
+    def update_status_all_user(self):
+        """Обновить статус у всех пользователей"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'UPDATE users SET status=1')
             self._conn.commit()
 
     def rollback(self):
@@ -68,7 +83,7 @@ class Database:
         """Получить все города"""
         with self._conn.cursor() as cur:
             cur.execute(
-                "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public';"
+                "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='public' AND tablename NOT LIKE 'users';"
             )
             return cur.fetchall()
 
