@@ -9,7 +9,6 @@ from loader import bot, dp, base
 
 Bot.set_current(bot)
 app = web.Application()
-
 webhook_path = f'/{TOKEN}'
 base.create_user_table()
 

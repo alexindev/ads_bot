@@ -12,6 +12,7 @@ from config import *
 from state.states import *
 from keyboard.kb import *
 
+
 bot = Bot(TOKEN, parse_mode='HTML')
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -80,44 +81,46 @@ async def choise_city(callback: types.CallbackQuery):
 async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     """Выйти из FSM"""
     await callback.answer()
+    if await check_ban(callback.from_user.id):
+        if callback.data == 'back':
+            if await check_ban(callback.from_user.id):
+                await bot.edit_message_text(chat_id=callback.from_user.id,
+                                            message_id=callback.message.message_id,
+                                            text='Привет! Это бот, который поможет получить маршрут для работы!',
+                                            reply_markup=start)
+            await state.finish()
 
-    if callback.data == 'back':
-        if await check_ban(callback.from_user.id):
-            await bot.edit_message_text(chat_id=callback.from_user.id,
-                                        message_id=callback.message.message_id,
-                                        text='Привет! Это бот, который поможет получить маршрут для работы!',
-                                        reply_markup=start)
+        elif callback.data == 'back_ban':
+            await dp.storage.update_data(chat=callback.from_user.id, data={'key': 'stop'})
+            user_data = base.get_user_data(str(callback.from_user.id))
+            city = user_data[1]
+            job_id = user_data[2]
+
+            base.update_job_status(city, job_id, status=1)
+            base.update_user_status(str(callback.from_user.id), status=0)
+            await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
+            await bot.send_message(chat_id=callback.from_user.id,
+                                   text='Маршрут отменен. Доступ ограничен на 6 часов.\nПо истечению этого времени используйте команду /start')
+            await state.finish()
+
+            # ожидание разбана
+            asyncio.create_task(ban_timeout(str(callback.from_user.id)))
+
+            group = await check_subscriber_group(callback.from_user.id)
+            if group == 'GROUP1':
+                await bot.send_message(chat_id=GROUP_CHAT_ID[0],
+                                       text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
+                                            f'Город: {city}\n'
+                                            f'Маршрут: # {job_id}\n'
+                                       )
+            elif group == 'GROUP2':
+                await bot.send_message(chat_id=GROUP_CHAT_ID[1],
+                                       text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
+                                            f'Город: {city}\n'
+                                            f'Маршрут: # {job_id}\n'
+                                       )
+    else:
         await state.finish()
-
-    elif callback.data == 'back_ban':
-        await dp.storage.update_data(chat=callback.from_user.id, data={'key': 'stop'})
-        user_data = base.get_user_data(str(callback.from_user.id))
-        city = user_data[1]
-        job_id = user_data[2]
-
-        base.update_job_status(city, job_id, status=1)
-        base.update_user_status(str(callback.from_user.id), status=0)
-        await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
-        await bot.send_message(chat_id=callback.from_user.id,
-                               text='Маршрут отменен. Доступ ограничен на 6 часов')
-        await state.finish()
-
-        # ожидание разбана
-        asyncio.create_task(ban_timeout(str(callback.from_user.id)))
-
-        group = await check_subscriber_group(callback.from_user.id)
-        if group == 'GROUP1':
-            await bot.send_message(chat_id=GROUP_CHAT_ID[0],
-                                   text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
-                                        f'Город: {city}\n'
-                                        f'Маршрут: # {job_id}\n'
-                                   )
-        elif group == 'GROUP2':
-            await bot.send_message(chat_id=GROUP_CHAT_ID[1],
-                                   text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
-                                        f'Город: {city}\n'
-                                        f'Маршрут: # {job_id}\n'
-                                   )
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('city_'))
@@ -158,13 +161,15 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
 
         if not base.get_user_data(str(callback.from_user.id)):
             base.set_user_info(str(callback.from_user.id), city, job[1], status=1)
+        base.update_user_info(str(callback.from_user.id), city, job[1], status=1)
 
         base.update_job_status(city, job[1], status=0)
+        await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
         await bot.send_photo(chat_id=callback.from_user.id,
                              photo=job[0],
                              caption=f'Вам присвоен участок # {job[1]}\n\n'
                                      'Нажмите <b>"Далее"</b>, чтобы начать работу\n\n'
-                                     'В случае отмены доступ к боту будет <b>ограничен на 6 часов</b>',
+                                     '<b>В СЛУЧАЕ ОТМЕНЫ ДОСТУП К БОТУ БУДЕТ ОГРАНИЧЕН НА 6 ЧАСОВ</b>',
                              reply_markup=to_work_ban)
         await state.set_state(User.start_working)
 
@@ -424,16 +429,14 @@ async def check_state_timeout(state: FSMContext, city: str, job_id: str, update)
     while time.time() < end_time:
         current_state = await state.get_state()
         data = await dp.storage.get_data(chat=update.from_user.id)
-        if current_state != User.end_job:
-            # Если перешли в финальный хендлер - выходим из цикла
+        if current_state.title().lower() != User.end_job.state.lower():
             await asyncio.sleep(1)
-
             if data.get('key') == 'stop':
-                # Если пользователь отменил работу - прерываем цикл
                 return
         else:
             return
     else:
+
         base.update_job_status(city, job_id, status=1)
         await bot.send_message(chat_id=update.from_user.id,
                                text='Прошло 48 часов. Маршрут не завершен. Отмена маршрута',

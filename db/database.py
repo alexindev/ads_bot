@@ -1,6 +1,6 @@
 import psycopg2
 from loguru import logger
-from ads_bot.config import PG_BASE, PG_USER, PG_PASS
+from config import PG_BASE, PG_USER, PG_PASS
 
 
 class Database:
@@ -19,7 +19,7 @@ class Database:
                 f'''CREATE TABLE IF NOT EXISTS "{city}" (
                     id SERIAL,
                     image VARCHAR(100),
-                    text VARCHAR(50),
+                    text INTEGER,
                     status INTEGER)
                 '''
             )
@@ -68,6 +68,14 @@ class Database:
                 'UPDATE users SET status=%s WHERE user_id=%s', (status, user_id,))
             self._conn.commit()
 
+    def update_user_info(self, user_id: str, city: str, job_id: str, status: int):
+        """Обновить статус пользователя"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'UPDATE users SET city=%s, job_id=%s, status=%s WHERE user_id=%s',
+                (city, job_id, status, user_id))
+            self._conn.commit()
+
     def update_status_all_user(self):
         """Обновить статус у всех пользователей"""
         with self._conn.cursor() as cur:
@@ -114,7 +122,7 @@ class Database:
             self._conn.commit()
 
     def get_job(self, city, text):
-        """Получить запись c идентификатором"""
+        """Получить запись с идентификатором"""
         with self._conn.cursor() as cur:
             cur.execute(f'SELECT * FROM "{city}" WHERE text=%s', (text,))
             return cur.fetchone()
@@ -122,7 +130,7 @@ class Database:
     def get_all_jobs(self, city):
         """Получить все маршруты из текущего города"""
         with self._conn.cursor() as cur:
-            cur.execute(f'SELECT text FROM "{city}"')
+            cur.execute(f'SELECT text FROM "{city}" ORDER BY text ASC')
             return cur.fetchall()
 
     def get_photo(self, city, text):
@@ -140,7 +148,7 @@ class Database:
     def get_job_photo_id(self, city, status):
         """Получить маршрут для работника"""
         with self._conn.cursor() as cur:
-            cur.execute(f'SELECT image, text FROM "{city}" WHERE status=%s', (status,))
+            cur.execute(f'SELECT image, text FROM "{city}" WHERE status=%s ORDER BY id ASC', (status,))
             return cur.fetchone()
 
     def update_job_status(self, city, text, status):
