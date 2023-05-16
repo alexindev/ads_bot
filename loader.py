@@ -12,7 +12,6 @@ from config import *
 from state.states import *
 from keyboard.kb import *
 
-
 bot = Bot(TOKEN, parse_mode='HTML')
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -334,10 +333,9 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
     jobs_kb_list = get_jobs_kb(base, city)
     if jobs_kb_list:
         for jobs_kb in jobs_kb_list:
-            await bot.edit_message_text(chat_id=callback.from_user.id,
-                                        message_id=callback.message.message_id,
-                                        text='Все маршруты:',
-                                        reply_markup=jobs_kb)
+            await bot.send_message(chat_id=callback.from_user.id,
+                                   text='Все маршруты:',
+                                   reply_markup=jobs_kb)
         await state.set_state(Admin.jobs_list)
     else:
         await bot.edit_message_text(chat_id=callback.from_user.id,
