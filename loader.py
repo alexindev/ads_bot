@@ -334,14 +334,16 @@ async def get_jobs(callback: types.CallbackQuery, state: FSMContext):
     jobs_kb_list = get_jobs_kb(base, city)
     if jobs_kb_list:
         for jobs_kb in jobs_kb_list:
-            await bot.send_message(chat_id=callback.from_user.id,
-                                   text='Все маршруты:',
-                                   reply_markup=jobs_kb)
+            await bot.edit_message_text(chat_id=callback.from_user.id,
+                                        message_id=callback.message.message_id,
+                                        text='Все маршруты:',
+                                        reply_markup=jobs_kb)
         await state.set_state(Admin.jobs_list)
     else:
-        await bot.send_message(chat_id=callback.from_user.id,
-                               text='Ни одного маршрута не добавлено',
-                               reply_markup=back_back)
+        await bot.edit_message_text(chat_id=callback.from_user.id,
+                                    message_id=callback.message.message_id,
+                                    text='Ни одного маршрута не добавлено',
+                                    reply_markup=back_back)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('job_'), state=Admin.jobs_list)
