@@ -138,32 +138,31 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
                                     reply_markup=admim_city_config)
         await state.set_state(Admin.job)
     else:
+        if not base.get_user_city(str(callback.from_user.id)):
+            base.set_user_info(str(callback.from_user.id), city_name, status=1)
+        else:
+            base.update_user_info(str(callback.from_user.id), city_name, status=1)
         await bot.edit_message_text(chat_id=callback.from_user.id,
                                     message_id=callback.message.message_id,
                                     text=f'Выбран город: {city_name}. Приступить к работе?',
                                     reply_markup=ready_to_work)
+        await state.set_state(User.get_job)
 
 
-@dp.callback_query_handler(lambda c: c.data == 'start_job', state='*')
+@dp.callback_query_handler(lambda c: c.data == 'start_job', state=User.get_job)
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
     """Подготовка к работе"""
     await callback.answer()
 
-    async with state.proxy() as data:
-        city = data.get('current_city')
+    await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
 
-    job = base.get_job_photo_id(city, status=1)
+    city = base.get_user_city(str(callback.from_user.id))
+    job = base.get_job_photo_id(city[0], status=1)
 
     if job:
-        async with state.proxy() as data:
-            data['job_id'] = job[1]
+        base.set_job_id(job[1], str(callback.from_user.id))
+        base.update_job_status(city[0], job[1], status=0)
 
-        if not base.get_user_data(str(callback.from_user.id)):
-            base.set_user_info(str(callback.from_user.id), city, job[1], status=1)
-        base.update_user_info(str(callback.from_user.id), city, job[1], status=1)
-
-        base.update_job_status(city, job[1], status=0)
-        await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
         await bot.send_photo(chat_id=callback.from_user.id,
                              photo=job[0],
                              caption=f'Вам присвоен участок # {job[1]}\n\n'
@@ -176,23 +175,22 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
         if group == 'GROUP1':
             await bot.send_message(chat_id=GROUP_CHAT_ID[0],
                                    text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
-                                        f'Город: {city}\n'
+                                        f'Город: {city[0]}\n'
                                         f'Назначен участок: # {job[1]}')
         elif group == 'GROUP2':
             await bot.send_message(chat_id=GROUP_CHAT_ID[1],
                                    text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
-                                        f'Город: {city}\n'
+                                        f'Город: {city[0]}\n'
                                         f'Назначен участок: # {job[1]}')
 
         # Таймер до завершения маршрута
-        asyncio.create_task(check_state_timeout(state, city, job[1], callback))
+        asyncio.create_task(check_state_timeout(state, city[0], job[1], callback))
 
     else:
-        await bot.edit_message_text(chat_id=callback.from_user.id,
-                                    message_id=callback.message.message_id,
-                                    text='На данный момент нет доступных маршрутов, повторите попытку позже',
-                                    reply_markup=back_back)
-        base.update_status(city, status=1)
+        await bot.send_message(chat_id=callback.from_user.id,
+                               text='На данный момент нет доступных маршрутов, повторите попытку позже',
+                               reply_markup=back_back)
+        base.update_status(city[0], status=1)
         await state.finish()
 
 
@@ -200,6 +198,7 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
 async def started_work(callback: types.CallbackQuery, state: FSMContext):
     """Начало работы работника"""
     await callback.answer()
+    base.set_message_id(str(callback.from_user.id), callback.message.message_id)
 
     await bot.send_message(chat_id=callback.from_user.id,
                            text='Можно приступать к работе. Отчеты необходимо присылать в чат. По завершению маршрута, нажмите на "Завершить маршрут"\n',
@@ -253,6 +252,8 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
                                     f'Город: {city}\n'
                                     f'Маршрут: # {job_id}\n'
                                )
+    message = base.get_message_id(str(callback.from_user.id))
+    await bot.delete_message(chat_id=callback.from_user.id, message_id=message[0])
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
@@ -423,13 +424,12 @@ async def check_state_timeout(state: FSMContext, city: str, job_id: str, update)
     # Начинаем отсчет времени
     end_time = time.time() + 172_800
 
-    city = city
-    job_id = job_id
-
     while time.time() < end_time:
         current_state = await state.get_state()
         data = await dp.storage.get_data(chat=update.from_user.id)
-        if current_state.title().lower() != User.end_job.state.lower():
+        if current_state is None:
+            return
+        elif current_state.title().lower() != User.end_job.state.lower():
             await asyncio.sleep(1)
             if data.get('key') == 'stop':
                 return

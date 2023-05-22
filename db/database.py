@@ -33,12 +33,21 @@ class Database:
                     user_id VARCHAR(20) PRIMARY KEY,
                     city VARCHAR(50),
                     job_id VARCHAR(10),
-                    status INTEGER
-                )'''
+                    status INTEGER,
+                    message_id INTEGER)
+                '''
             )
         self._conn.commit()
 
-    def get_user_data(self, user_id):
+    def get_user_city(self, user_id: str):
+        """Информация о городе"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'SELECT city FROM users WHERE user_id=%s', (user_id,)
+            )
+            return cur.fetchone()
+
+    def get_user_data(self, user_id: str):
         """Информация о работнике"""
         with self._conn.cursor() as cur:
             cur.execute(
@@ -46,13 +55,35 @@ class Database:
             )
             return cur.fetchone()
 
-    def set_user_info(self, user_id, city, job_id, status):
+    def set_user_info(self, user_id, city, status):
         """Записать данные рабоника"""
         with self._conn.cursor() as cur:
             cur.execute(
-                'INSERT INTO users (user_id, city, job_id, status) VALUES (%s, %s, %s, %s)',
-                (user_id, city, job_id, status))
+                'INSERT INTO users (user_id, city, status) VALUES (%s, %s, %s)',
+                (user_id, city, status))
             self._conn.commit()
+
+    def set_job_id(self, job_id, user_id):
+        """Добавить job_id для работника"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'UPDATE users SET job_id=%s WHERE user_id=%s', (job_id, user_id,))
+            self._conn.commit()
+
+    def set_message_id(self, user_id: str, message_id: int):
+        """Добавить job_id для работника"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'UPDATE users SET message_id=%s WHERE user_id=%s', (message_id, user_id))
+            self._conn.commit()
+
+    def get_message_id(self, user_id: str):
+        """Message ID с заданием"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'SELECT message_id FROM users WHERE user_id=%s', (user_id,)
+            )
+            return cur.fetchone()
 
     def delete_user_data(self, user_id: str):
         """Удалить данные пользователя"""
@@ -68,12 +99,12 @@ class Database:
                 'UPDATE users SET status=%s WHERE user_id=%s', (status, user_id,))
             self._conn.commit()
 
-    def update_user_info(self, user_id: str, city: str, job_id: str, status: int):
+    def update_user_info(self, user_id: str, city: str, status: int):
         """Обновить статус пользователя"""
         with self._conn.cursor() as cur:
             cur.execute(
-                'UPDATE users SET city=%s, job_id=%s, status=%s WHERE user_id=%s',
-                (city, job_id, status, user_id))
+                'UPDATE users SET city=%s, status=%s WHERE user_id=%s',
+                (city, status, user_id))
             self._conn.commit()
 
     def update_status_all_user(self):

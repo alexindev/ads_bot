@@ -5,6 +5,7 @@ class Job(StatesGroup):
     text = State()
 
 class User(StatesGroup):
+    get_job = State()
     start_working = State()
     make_report = State()
     continue_work = State()
