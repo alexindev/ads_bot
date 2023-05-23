@@ -122,6 +122,7 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
             else:
                 logger.info('юзер не состоит ни в одной группе')
                 await state.finish()
+                return
     else:
         await state.finish()
 
@@ -164,17 +165,6 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
     job = base.get_job_photo_id(city[0], status=1)
 
     if job:
-        base.set_job_id(job[1], str(callback.from_user.id))
-        base.update_job_status(city[0], job[1], status=0)
-
-        await bot.send_photo(chat_id=callback.from_user.id,
-                             photo=job[0],
-                             caption=f'Вам присвоен участок # {job[1]}\n\n'
-                                     'Нажмите <b>"Далее"</b>, чтобы начать работу\n\n'
-                                     '<b>В СЛУЧАЕ ОТМЕНЫ ДОСТУП К БОТУ БУДЕТ ОГРАНИЧЕН НА 6 ЧАСОВ</b>',
-                             reply_markup=to_work_ban)
-        await state.set_state(User.start_working)
-
         group = await check_subscriber_group(callback.from_user.id)
         if group == 'GROUP1':
             await bot.send_message(chat_id=GROUP_CHAT_ID[0],
@@ -189,6 +179,18 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
         else:
             logger.info('юзер не состоит ни в одной группе')
             await state.finish()
+            return
+
+        base.set_job_id(job[1], str(callback.from_user.id))
+        base.update_job_status(city[0], job[1], status=0)
+
+        await bot.send_photo(chat_id=callback.from_user.id,
+                             photo=job[0],
+                             caption=f'Вам присвоен участок # {job[1]}\n\n'
+                                     'Нажмите <b>"Далее"</b>, чтобы начать работу\n\n'
+                                     '<b>В СЛУЧАЕ ОТМЕНЫ ДОСТУП К БОТУ БУДЕТ ОГРАНИЧЕН НА 6 ЧАСОВ</b>',
+                             reply_markup=to_work_ban)
+        await state.set_state(User.start_working)
 
         # Таймер до завершения маршрута
         asyncio.create_task(check_state_timeout(state, city[0], job[1], callback))
