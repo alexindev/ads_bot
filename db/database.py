@@ -77,14 +77,6 @@ class Database:
                 'UPDATE users SET message_id=%s WHERE user_id=%s', (message_id, user_id))
             self._conn.commit()
 
-    def get_message_id(self, user_id: str):
-        """Message ID с заданием"""
-        with self._conn.cursor() as cur:
-            cur.execute(
-                'SELECT message_id FROM users WHERE user_id=%s', (user_id,)
-            )
-            return cur.fetchone()
-
     def delete_user_data(self, user_id: str):
         """Удалить данные пользователя"""
         with self._conn.cursor() as cur:

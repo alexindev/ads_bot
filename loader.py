@@ -12,6 +12,7 @@ from config import *
 from state.states import *
 from keyboard.kb import *
 
+
 bot = Bot(TOKEN, parse_mode='HTML')
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
@@ -118,6 +119,9 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
                                             f'Город: {city}\n'
                                             f'Маршрут: # {job_id}\n'
                                        )
+            else:
+                logger.info('юзер не состоит ни в одной группе')
+                await state.finish()
     else:
         await state.finish()
 
@@ -182,6 +186,9 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
                                    text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
                                         f'Город: {city[0]}\n'
                                         f'Назначен участок: # {job[1]}')
+        else:
+            logger.info('юзер не состоит ни в одной группе')
+            await state.finish()
 
         # Таймер до завершения маршрута
         asyncio.create_task(check_state_timeout(state, city[0], job[1], callback))
@@ -235,25 +242,26 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
     """Завершается маршрут"""
     await callback.answer()
 
-    async with state.proxy() as data:
-        job_id = data.get('job_id')
-        city = data.get('current_city')
+    message = base.get_user_data(str(callback.from_user.id))
 
     group = await check_subscriber_group(callback.from_user.id)
     if group == 'GROUP1':
         await bot.send_message(chat_id=GROUP_CHAT_ID[0],
                                text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
-                                    f'Город: {city}\n'
-                                    f'Маршрут: # {job_id}\n'
+                                    f'Город: {message[1]}\n'
+                                    f'Маршрут: # {message[2]}\n'
                                )
     elif group == 'GROUP2':
         await bot.send_message(chat_id=GROUP_CHAT_ID[1],
                                text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
-                                    f'Город: {city}\n'
-                                    f'Маршрут: # {job_id}\n'
+                                    f'Город: {message[1]}\n'
+                                    f'Маршрут: # {message[2]}\n'
                                )
-    message = base.get_message_id(str(callback.from_user.id))
-    await bot.delete_message(chat_id=callback.from_user.id, message_id=message[0])
+    else:
+        logger.info('юзер не состоит ни в одной группе')
+        await state.finish()
+
+    await bot.delete_message(chat_id=callback.from_user.id, message_id=message[-1])
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
