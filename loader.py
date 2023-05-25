@@ -26,6 +26,11 @@ async def start_command_handler(message: types.Message):
             await bot.send_message(message.from_user.id,
                                    text='Привет! Это бот, который поможет получить маршрут для работы!',
                                    reply_markup=start)
+        else:
+            await bot.send_message(message.from_user.id, 'Только для участников групп своего города')
+    else:
+        await bot.send_message(message.from_user.id, 'Действует ограничение. Повторите попытку позже',
+                               reply_markup=back_back)
 
 
 @dp.message_handler(commands=['help'])
@@ -42,7 +47,11 @@ async def help_cmd(message: types.Message):
                                         'После отправки последнего отчета <b>кнопка "Завершить маршрут"</b>',
 
                                    reply_markup=back_back)
-
+        else:
+            await bot.send_message(message.from_user.id, 'Только для участников групп своего города')
+    else:
+        await bot.send_message(message.from_user.id, 'Действует ограничение. Повторите попытку позже',
+                               reply_markup=back_back)
 
 @dp.message_handler(commands=['config'])
 async def config(message: types.Message):
@@ -51,7 +60,8 @@ async def config(message: types.Message):
         await bot.send_message(chat_id=message.from_user.id,
                                text='Меню настроек:',
                                reply_markup=config_kb)
-
+    else:
+        await bot.send_message(message.from_user.id, 'Нет доступа', reply_markup=back_back)
 
 @dp.callback_query_handler(lambda c: c.data == 'update_status')
 async def update_status(callback: types.CallbackQuery):
@@ -70,11 +80,17 @@ async def choise_city(callback: types.CallbackQuery):
     """Вывести все города в инлайн кнопках"""
     await callback.answer()
     if await check_ban(callback.from_user.id):
-        cities = get_cities_keyboard(base)
-        await bot.edit_message_text(chat_id=callback.from_user.id,
-                                    message_id=callback.message.message_id,
-                                    text='Выберите город:',
-                                    reply_markup=cities)
+        if callback.from_user.id in ADMINS or await check_subsciber(callback.from_user.id):
+            cities = get_cities_keyboard(base)
+            await bot.edit_message_text(chat_id=callback.from_user.id,
+                                        message_id=callback.message.message_id,
+                                        text='Выберите город:',
+                                        reply_markup=cities)
+        else:
+            await bot.send_message(callback.from_user.id, 'Только для участников групп своего города')
+    else:
+        await bot.send_message(callback.from_user.id, 'Действует ограничение. Повторите попытку позже',
+                               reply_markup=back_back)
 
 
 @dp.callback_query_handler(lambda c: c.data.startswith('back'), state='*')
@@ -124,6 +140,7 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
                 await state.finish()
                 return
     else:
+        await bot.send_message(callback.from_user.id, 'Действует ограничение. Повторите попытку позже')
         await state.finish()
 
 
@@ -158,8 +175,6 @@ async def city_callback(callback: types.CallbackQuery, state: FSMContext):
 async def start_work(callback: types.CallbackQuery, state: FSMContext):
     """Подготовка к работе"""
     await callback.answer()
-
-    await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
 
     city = base.get_user_city(str(callback.from_user.id))
     job = base.get_job_photo_id(city[0], status=1)
@@ -208,7 +223,6 @@ async def started_work(callback: types.CallbackQuery, state: FSMContext):
     """Начало работы работника"""
     await callback.answer()
     base.set_message_id(str(callback.from_user.id), callback.message.message_id)
-
     await bot.send_message(chat_id=callback.from_user.id,
                            text='Можно приступать к работе. Отчеты необходимо присылать в чат. По завершению маршрута, нажмите на "Завершить маршрут"\n',
                            reply_markup=user_send_report
@@ -446,7 +460,6 @@ async def check_state_timeout(state: FSMContext, city: str, job_id: str, update)
         else:
             return
     else:
-
         base.update_job_status(city, job_id, status=1)
         await bot.send_message(chat_id=update.from_user.id,
                                text='Прошло 48 часов. Маршрут не завершен. Отмена маршрута',
