@@ -22,7 +22,7 @@ base = Database()
 @dp.message_handler(commands=['start'])
 async def start_command_handler(message: types.Message):
     if await check_ban(message.from_user.id):
-        if message.from_user.id in ADMINS or await check_subsciber(message.from_user.id):
+        if message.from_user.id in ADMINS or await check_subscriber_group(message.from_user.id):
             await bot.send_message(message.from_user.id,
                                    text='Привет! Это бот, который поможет получить маршрут для работы!',
                                    reply_markup=start)
@@ -36,7 +36,8 @@ async def start_command_handler(message: types.Message):
 @dp.message_handler(commands=['help'])
 async def help_cmd(message: types.Message):
     if await check_ban(message.from_user.id):
-        if message.from_user.id in ADMINS or await check_subsciber(message.from_user.id):
+        user = base.get_user_data(str(message.from_user.id))
+        if message.from_user.id in ADMINS or user:
             await bot.send_message(message.from_user.id,
                                    text='<b>Памятки для работы с ботом:</b>\n\n'
                                         'Для начала работы необходимо в главном меню выбрать свой город <b>кнопка "Выбрать город"</b>\n\n'
@@ -45,10 +46,9 @@ async def help_cmd(message: types.Message):
                                         'Если отменить полученный маршрут, <b>закроется доступ к боту на 6 часов</b>\n\n'
                                         'Незавершенный маршрут будет автоматически отменен через 48 часов'
                                         'После отправки последнего отчета <b>кнопка "Завершить маршрут"</b>',
-
                                    reply_markup=back_back)
         else:
-            await bot.send_message(message.from_user.id, 'Только для участников групп своего города')
+            await bot.send_message(message.from_user.id, 'Необходима регистрация. Для этого нажмите на команду /start')
     else:
         await bot.send_message(message.from_user.id, 'Действует ограничение. Повторите попытку позже',
                                reply_markup=back_back)
@@ -79,15 +79,16 @@ async def update_status(callback: types.CallbackQuery):
 async def choise_city(callback: types.CallbackQuery):
     """Вывести все города в инлайн кнопках"""
     await callback.answer()
+    user = base.get_user_data(str(callback.from_user.id))
     if await check_ban(callback.from_user.id):
-        if callback.from_user.id in ADMINS or await check_subsciber(callback.from_user.id):
+        if callback.from_user.id in ADMINS or user:
             cities = get_cities_keyboard(base)
             await bot.edit_message_text(chat_id=callback.from_user.id,
                                         message_id=callback.message.message_id,
                                         text='Выберите город:',
                                         reply_markup=cities)
         else:
-            await bot.send_message(callback.from_user.id, 'Только для участников групп своего города')
+            await bot.send_message(callback.from_user.id, 'Необходима регистрация. Для этого нажмите на команду /start')
     else:
         await bot.send_message(callback.from_user.id, 'Действует ограничение. Повторите попытку позже',
                                reply_markup=back_back)
@@ -99,11 +100,10 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     if await check_ban(callback.from_user.id):
         if callback.data == 'back':
-            if await check_ban(callback.from_user.id):
-                await bot.edit_message_text(chat_id=callback.from_user.id,
-                                            message_id=callback.message.message_id,
-                                            text='Привет! Это бот, который поможет получить маршрут для работы!',
-                                            reply_markup=start)
+            await bot.edit_message_text(chat_id=callback.from_user.id,
+                                        message_id=callback.message.message_id,
+                                        text='Привет! Это бот, который поможет получить маршрут для работы!',
+                                        reply_markup=start)
             await state.finish()
 
         elif callback.data == 'back_ban':
@@ -122,14 +122,14 @@ async def cancel_fsm(callback: types.CallbackQuery, state: FSMContext):
             # ожидание разбана
             asyncio.create_task(ban_timeout(str(callback.from_user.id)))
 
-            group = await check_subscriber_group(callback.from_user.id)
-            if group == 'GROUP1':
+            group = base.get_user_data(str(callback.from_user.id))
+            if group[5] == 1:
                 await bot.send_message(chat_id=GROUP_CHAT_ID[0],
                                        text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
                                             f'Город: {city}\n'
                                             f'Маршрут: # {job_id}\n'
                                        )
-            elif group == 'GROUP2':
+            elif group[5] == 2:
                 await bot.send_message(chat_id=GROUP_CHAT_ID[1],
                                        text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> отменил маршрут\n'
                                             f'Город: {city}\n'
@@ -178,15 +178,14 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
 
     city = base.get_user_city(str(callback.from_user.id))
     job = base.get_job_photo_id(city[0], status=1)
-
     if job:
-        group = await check_subscriber_group(callback.from_user.id)
-        if group == 'GROUP1':
+        group = base.get_user_data(str(callback.from_user.id))
+        if group[5] == 1:
             await bot.send_message(chat_id=GROUP_CHAT_ID[0],
                                    text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
                                         f'Город: {city[0]}\n'
                                         f'Назначен участок: # {job[1]}')
-        elif group == 'GROUP2':
+        elif group[5] == 2:
             await bot.send_message(chat_id=GROUP_CHAT_ID[1],
                                    text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> приступил к работе\n'
                                         f'Город: {city[0]}\n'
@@ -211,6 +210,7 @@ async def start_work(callback: types.CallbackQuery, state: FSMContext):
         asyncio.create_task(check_state_timeout(state, city[0], job[1], callback))
 
     else:
+        await bot.delete_message(chat_id=callback.from_user.id, message_id=callback.message.message_id)
         await bot.send_message(chat_id=callback.from_user.id,
                                text='На данный момент нет доступных маршрутов, повторите попытку позже',
                                reply_markup=back_back)
@@ -259,15 +259,15 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
 
     message = base.get_user_data(str(callback.from_user.id))
+    group = base.get_user_data(str(callback.from_user.id))
 
-    group = await check_subscriber_group(callback.from_user.id)
-    if group == 'GROUP1':
+    if group[5] == 1:
         await bot.send_message(chat_id=GROUP_CHAT_ID[0],
                                text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
                                     f'Город: {message[1]}\n'
                                     f'Маршрут: # {message[2]}\n'
                                )
-    elif group == 'GROUP2':
+    elif group[5] == 2:
         await bot.send_message(chat_id=GROUP_CHAT_ID[1],
                                text=f'Работник <a href="tg://user?id={callback.from_user.id}">{callback.from_user.full_name}</a> завершил маршрут\n'
                                     f'Город: {message[1]}\n'
@@ -277,7 +277,7 @@ async def end_work(callback: types.CallbackQuery, state: FSMContext):
         logger.info('юзер не состоит ни в одной группе')
         await state.finish()
 
-    await bot.delete_message(chat_id=callback.from_user.id, message_id=message[-1])
+    await bot.delete_message(chat_id=callback.from_user.id, message_id=message[4])
 
     await bot.edit_message_text(chat_id=callback.from_user.id,
                                 message_id=callback.message.message_id,
@@ -467,21 +467,6 @@ async def check_state_timeout(state: FSMContext, city: str, job_id: str, update)
         await state.finish()
 
 
-async def check_subsciber(user_id) -> bool:
-    """Проверка участников групп"""
-    for group in USERS_GROUP1 + USERS_GROUP2:
-        try:
-            chat_member = await bot.get_chat_member(chat_id=group, user_id=user_id)
-            if chat_member.status == 'member':
-                return True
-        except ChatNotFound:
-            pass
-        except Exception as e:
-            logger.error(e)
-            return False
-    return False
-
-
 async def check_subscriber_group(user_id):
     """Проверка группы подписчика"""
     for group in USERS_GROUP1 + USERS_GROUP2:
@@ -489,15 +474,19 @@ async def check_subscriber_group(user_id):
             chat_member = await bot.get_chat_member(chat_id=group, user_id=user_id)
             if chat_member.status == 'member':
                 if group in USERS_GROUP1:
-                    return "GROUP1"
+                    base.update_user_group(str(user_id), 1)
+                    logger.info('member 1', group, user_id)
                 elif group in USERS_GROUP2:
-                    return "GROUP2"
+                    logger.info('member 2', group, user_id)
+                    base.update_user_group(str(user_id), 2)
+                return True
         except ChatNotFound:
+            logger.info(group)
             pass
         except Exception as e:
-            logger.error(e)
-    logger.error(f'Пользователь {user_id.from_user.full_name} не состоит ни в одной группе')
-    return None
+            logger.error(f'{e} {group}')
+    logger.error(f'Пользователь {user_id} не состоит ни в одной группе')
+    return False
 
 
 async def ban_timeout(user_id):
@@ -514,7 +503,7 @@ async def check_ban(user_id) -> bool:
     user_data = base.get_user_data(str(user_id))
     if user_data:
         status = user_data[3]
-        if status == 1:
+        if status == 1 or not status:
             return True
         return False
     return True

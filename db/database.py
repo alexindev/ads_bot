@@ -34,7 +34,8 @@ class Database:
                     city VARCHAR(50),
                     job_id VARCHAR(10),
                     status INTEGER,
-                    message_id INTEGER)
+                    message_id INTEGER,
+                    group_id INTEGER)
                 '''
             )
         self._conn.commit()
@@ -187,5 +188,14 @@ class Database:
         with self._conn.cursor() as cur:
             cur.execute(
                 f'UPDATE "{city}" SET status=%s', (status,)
+            )
+            self._conn.commit()
+
+    def update_user_group(self, user_id, group_id):
+        """Добавить или обновить работника"""
+        with self._conn.cursor() as cur:
+            cur.execute(
+                'INSERT INTO users (user_id, group_id) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET group_id=%s',
+                (user_id, group_id, group_id)
             )
             self._conn.commit()
